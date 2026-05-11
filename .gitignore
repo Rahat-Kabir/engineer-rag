@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# uv
+.uv/
+
+# Env / secrets
+.env
+.env.local
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# App data
+data/.cache/
+*.db
+*.sqlite
+*.sqlite3
+
+# Qdrant local volume (if ever bind-mounted)
+qdrant_storage/
+
+# Claude Code (local-only)
+.claude/settings.local.json
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Logs
+*.log
+
+# Third-party article copies (kept local only — see README for adding your own)
+data/articles/companies/

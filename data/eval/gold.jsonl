@@ -1,0 +1,15 @@
+{"question": "what is context rot?", "expected_chunk_ids": ["companies/anthropic/effective-context-engineering#1"]}
+{"question": "how should I write system prompts?", "expected_chunk_ids": ["companies/anthropic/effective-context-engineering#2"]}
+{"question": "what is voice lock?", "expected_chunk_ids": ["companies/openai/perplexity-voice-search#2"]}
+{"question": "when should I use compaction vs note-taking?", "expected_chunk_ids": ["companies/anthropic/effective-context-engineering#5", "companies/anthropic/effective-context-engineering#6", "companies/anthropic/effective-context-engineering#7"]}
+{"question": "how should I handle long-form context in voice agents?", "expected_chunk_ids": ["companies/openai/perplexity-voice-search#0"]}
+{"question": "what is context engineering?", "expected_chunk_ids": ["companies/anthropic/effective-context-engineering#0"]}
+{"question": "what's the difference between prompt engineering and context engineering?", "expected_chunk_ids": ["companies/anthropic/effective-context-engineering#0"]}
+{"question": "what is Anthropic's definition of an agent?", "expected_chunk_ids": ["companies/anthropic/effective-context-engineering#3"]}
+{"question": "why are bloated tool sets a problem?", "expected_chunk_ids": ["companies/anthropic/effective-context-engineering#3"]}
+{"question": "what is just-in-time context retrieval?", "expected_chunk_ids": ["companies/anthropic/effective-context-engineering#3", "companies/anthropic/effective-context-engineering#4"]}
+{"question": "how should I use system, user, and assistant message roles?", "expected_chunk_ids": ["companies/openai/perplexity-voice-search#1"]}
+{"question": "how does Perplexity standardize audio across platforms?", "expected_chunk_ids": ["companies/openai/perplexity-voice-search#1"]}
+{"question": "how should I tune VAD?", "expected_chunk_ids": ["companies/openai/perplexity-voice-search#2"]}
+{"question": "how should tool outputs be formatted?", "expected_chunk_ids": ["companies/openai/perplexity-voice-search#3"]}
+{"question": "how do I deploy a Streamlit app?", "expected_chunk_ids": []}
