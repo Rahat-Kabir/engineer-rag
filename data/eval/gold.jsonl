@@ -13,3 +13,42 @@
 {"question": "how should I tune VAD?", "expected_chunk_ids": ["companies/openai/perplexity-voice-search#2"]}
 {"question": "how should tool outputs be formatted?", "expected_chunk_ids": ["companies/openai/perplexity-voice-search#3"]}
 {"question": "how do I deploy a Streamlit app?", "expected_chunk_ids": []}
+{"question": "what is the bash loop used to keep Claude running continuously on the C compiler project?", "expected_chunk_ids": ["companies/anthropic/c-compiler-parallel-claudes#1"]}
+{"question": "how did parallel Claude agents avoid working on the same task at the same time?", "expected_chunk_ids": ["companies/anthropic/c-compiler-parallel-claudes#2"]}
+{"question": "how was GCC used as a known-good oracle when compiling the Linux kernel?", "expected_chunk_ids": ["companies/anthropic/c-compiler-parallel-claudes#4"]}
+{"question": "how much did the C compiler project cost in API fees?", "expected_chunk_ids": ["companies/anthropic/c-compiler-parallel-claudes#5"]}
+{"question": "what is the role of the initializer agent versus the coding agent?", "expected_chunk_ids": ["companies/anthropic/effective-harnesses-long-running-agents#0"]}
+{"question": "how do you stop a coding agent from one-shotting an entire app?", "expected_chunk_ids": ["companies/anthropic/effective-harnesses-long-running-agents#2"]}
+{"question": "why does Anthropic prefer JSON over Markdown for the feature list file?", "expected_chunk_ids": ["companies/anthropic/effective-harnesses-long-running-agents#2"]}
+{"question": "how many features did the claude.ai clone require?", "expected_chunk_ids": ["companies/anthropic/effective-harnesses-long-running-agents#2"]}
+{"question": "what is the pets vs cattle analogy in Managed Agents?", "expected_chunk_ids": ["companies/anthropic/scaling-managed-agents#1"]}
+{"question": "how much did time-to-first-token improve after decoupling the brain from the hands?", "expected_chunk_ids": ["companies/anthropic/scaling-managed-agents#4"]}
+{"question": "how does Managed Agents keep credentials away from Claude's generated code?", "expected_chunk_ids": ["companies/anthropic/scaling-managed-agents#2"]}
+{"question": "what interface lets the harness fetch events from the session log?", "expected_chunk_ids": ["companies/anthropic/scaling-managed-agents#3"]}
+{"question": "what is the alphabet soup of AI agent protocols?", "expected_chunk_ids": ["companies/google/5-dev-ai-tips#2"]}
+{"question": "why should LLMs not perform mathematical calculations directly in agents?", "expected_chunk_ids": ["companies/google/5-dev-ai-tips#2"]}
+{"question": "how much did Team Daniel and Luis reduce processing time by running parallel agents?", "expected_chunk_ids": ["companies/google/5-dev-ai-tips#0"]}
+{"question": "how did Nano Banana change the virtual try-on use case?", "expected_chunk_ids": ["companies/google/5-dev-ai-tips#1"]}
+{"question": "what did METR find about how long frontier models can reason continuously?", "expected_chunk_ids": ["companies/openai/ai-native-engineering-team#0"]}
+{"question": "how does Cloudwalk use Codex day to day?", "expected_chunk_ids": ["companies/openai/ai-native-engineering-team#5"]}
+{"question": "what kinds of bugs does Sansan use Codex review to catch?", "expected_chunk_ids": ["companies/openai/ai-native-engineering-team#7"]}
+{"question": "how often does model task length double?", "expected_chunk_ids": ["companies/openai/ai-native-engineering-team#0"]}
+{"question": "what is SKILL.md?", "expected_chunk_ids": ["companies/openai/shell-skills-compaction#0"]}
+{"question": "how should agents call protected APIs without exposing credentials to the model?", "expected_chunk_ids": ["companies/openai/shell-skills-compaction#3"]}
+{"question": "what improvement did Glean see with their Salesforce-oriented skill?", "expected_chunk_ids": ["companies/openai/shell-skills-compaction#4"]}
+{"question": "where should hosted shell agents write their artifacts?", "expected_chunk_ids": ["companies/openai/shell-skills-compaction#2"]}
+{"question": "what does Peter mean by blast radius when making changes?", "expected_chunk_ids": ["person/peter_steignburger/just-talk-to-it#1"]}
+{"question": "why does Peter prefer plain CLIs over MCP servers?", "expected_chunk_ids": ["person/peter_steignburger/just-talk-to-it#7"]}
+{"question": "how does Peter make codex continue a long-running refactor while he's away?", "expected_chunk_ids": ["person/peter_steignburger/just-talk-to-it#9"]}
+{"question": "how long is Peter's Agents.md file?", "expected_chunk_ids": ["person/peter_steignburger/just-talk-to-it#10"]}
+{"question": "what is the oracle CLI Peter built?", "expected_chunk_ids": ["person/peter_steignburger/shipping-at-inference-speed#2"]}
+{"question": "what is Clawdis and what does it have access to?", "expected_chunk_ids": ["person/peter_steignburger/shipping-at-inference-speed#3"]}
+{"question": "why does Peter commit directly to main instead of using worktrees?", "expected_chunk_ids": ["person/peter_steignburger/shipping-at-inference-speed#5"]}
+{"question": "what reasoning_effort does Peter use in his codex config?", "expected_chunk_ids": ["person/peter_steignburger/shipping-at-inference-speed#8"]}
+{"question": "what does Peter think about MCP servers?", "expected_chunk_ids": ["person/peter_steignburger/just-talk-to-it#7", "person/peter_steignburger/shipping-at-inference-speed#7"]}
+{"question": "how do you make autonomous agents verify their work end-to-end?", "expected_chunk_ids": ["companies/anthropic/effective-harnesses-long-running-agents#3", "companies/anthropic/c-compiler-parallel-claudes#3"]}
+{"question": "what role does git play in long-running agent harnesses?", "expected_chunk_ids": ["companies/anthropic/effective-harnesses-long-running-agents#0", "companies/anthropic/c-compiler-parallel-claudes#1", "companies/anthropic/c-compiler-parallel-claudes#2"]}
+{"question": "what is the role of an AGENTS.md file?", "expected_chunk_ids": ["companies/openai/ai-native-engineering-team#5", "companies/openai/ai-native-engineering-team#8", "person/peter_steignburger/just-talk-to-it#10"]}
+{"question": "how do I configure an NGINX reverse proxy?", "expected_chunk_ids": []}
+{"question": "explain how the Python GIL works", "expected_chunk_ids": []}
+{"question": "what is the time complexity of quicksort?", "expected_chunk_ids": []}
