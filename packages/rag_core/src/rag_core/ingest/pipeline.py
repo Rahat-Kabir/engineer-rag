@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from rag_core.ingest.chunk import chunk_document
 from rag_core.ingest.embed import embed_texts
 from rag_core.ingest.loader import iter_documents
+from rag_core.ingest.sparse import sparse_texts
 from rag_core.storage.qdrant import delete_doc, ensure_collection, upsert_chunks
 
 
@@ -21,8 +22,10 @@ def run_ingest() -> IngestStats:
         if not chunks:
             continue
         delete_doc(doc.doc_id)  # idempotent re-ingest
-        vectors = embed_texts([c.text for c in chunks])
-        upsert_chunks(chunks, vectors)
+        texts = [c.text for c in chunks]
+        dense = embed_texts(texts)
+        sparse = sparse_texts(texts)
+        upsert_chunks(chunks, dense, sparse)
         stats.documents += 1
         stats.chunks += len(chunks)
         print(f"  + {doc.doc_id}  ({len(chunks)} chunks)")
