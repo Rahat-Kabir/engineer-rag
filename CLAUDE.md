@@ -17,8 +17,10 @@ Folder-based ingest (`data/articles/**/index.md`), not a crawler.
 ## Stack (locked)
 
 - **Python**: 3.12+ (uv currently resolving 3.13). uv workspace.
-- **Vectors**: Qdrant (Docker, single container). Cosine, 1536d.
-- **Embedder**: OpenAI `text-embedding-3-small` (1536d).
+- **Vectors**: Qdrant (Docker, single container). Named vectors `dense` (cosine,
+  1536d) + `bm25` (sparse, IDF computed server-side).
+- **Embedder**: OpenAI `text-embedding-3-small` (dense) + `fastembed`
+  `Qdrant/bm25` (sparse).
 - **LLM**: configurable via `LLM_MODEL` (currently `gpt-5.4-mini`).
 - **UI**: Streamlit (dev/debug). FastAPI + Next.js planned (Phase 6+).
 - **Persistence**: SQLite planned for chat/feedback (Phase 6). No Postgres.
@@ -83,14 +85,15 @@ engineer-rag/
 │   └── PROGRESS.md            # phase status, decisions, limitations, next
 │
 ├── data/
-│   └── articles/
-│       └── companies/
-│           ├── anthropic/effective-context-engineering/
-│           │   ├── index.md
-│           │   ├── calibrating_prompt.webp
-│           │   └── prompt_vs_context_eng.webp
-│           └── openai/perplexity-voice-search/
-│               └── index.md
+│   ├── articles/                       # corpus (gitignored except README)
+│   │   ├── companies/
+│   │   │   ├── anthropic/<slug>/index.md   # + co-located *.webp / *.png
+│   │   │   ├── openai/<slug>/index.md
+│   │   │   └── google/<slug>/index.md
+│   │   └── person/
+│   │       └── <author>/<slug>/index.md
+│   └── eval/
+│       └── gold.jsonl                  # gold questions: {question, expected_chunk_ids}
 │
 ├── packages/
 │   └── rag_core/
@@ -102,13 +105,16 @@ engineer-rag/
 │           ├── ingest/
 │           │   ├── loader.py        # walks data/articles/**/index.md, parses frontmatter
 │           │   ├── chunk.py         # paragraph chunker, ≤500 / ≥80 tokens, image refs stripped
-│           │   ├── embed.py         # OpenAI batched embeddings
-│           │   └── pipeline.py      # orchestrator: ensure → load → chunk → embed → upsert
+│           │   ├── embed.py         # OpenAI batched dense embeddings
+│           │   ├── sparse.py        # fastembed BM25 sparse vectors
+│           │   └── pipeline.py      # orchestrator: ensure → load → chunk → embed+sparse → upsert
 │           ├── retrieval/
-│           │   └── search.py        # dense-only Qdrant search (hybrid + rerank in Phase 5b)
+│           │   └── search.py        # hybrid search: dense + BM25 sparse, fused with RRF (rerank in Phase 5b.2)
 │           ├── generation/
 │           │   ├── answer.py        # answer_question() → QueryResult
 │           │   └── prompts/answer.md
+│           ├── eval/
+│           │   └── run.py           # gold loader, recall@k, MRR, refusal-correct
 │           └── storage/
 │               └── qdrant.py        # ensure_collection / upsert_chunks / delete_doc / search
 │
@@ -120,11 +126,13 @@ engineer-rag/
 │
 └── scripts/
     ├── ingest.py                    # uv run python -m scripts.ingest
-    └── query.py                     # uv run python -m scripts.query "..."
+    ├── query.py                     # uv run python -m scripts.query "..."
+    ├── eval.py                      # uv run python -m scripts.eval
+    └── inspect.py                   # uv run python -m scripts.inspect {docs|chunks|chunk}
 ```
 
 _Planned but not built yet:_ `apps/api/` (FastAPI, Phase 6), `apps/ui_next/`
-(Next.js, Phase 7), `packages/rag_core/src/rag_core/eval/` (Phase 5a), `tests/`.
+(Next.js, Phase 7), `tests/`.
 
 ## Operating commands
 
@@ -134,6 +142,12 @@ uv sync
 uv run python -m scripts.ingest
 uv run python -m scripts.query "what is context rot?"
 uv run streamlit run apps/ui_streamlit/src/ui_streamlit/app.py
+
+# Eval and inspect
+uv run python -m scripts.eval
+uv run python -m scripts.inspect docs
+uv run python -m scripts.inspect chunks <doc_id>
+uv run python -m scripts.inspect chunk  <chunk_id>
 ```
 
 ## Collaboration

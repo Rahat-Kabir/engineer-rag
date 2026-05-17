@@ -40,3 +40,4 @@ qdrant_storage/
 
 # Third-party article copies (kept local only — see README for adding your own)
 data/articles/companies/
+data/articles/person/
