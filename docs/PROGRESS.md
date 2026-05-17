@@ -1,6 +1,6 @@
 # engineer-rag — progress
 
-_Last updated: 2026-05-17_
+_Last updated: 2026-05-18_
 
 ## What's working today
 
@@ -12,7 +12,8 @@ data/articles/**/index.md
    → paragraph chunker (≤500 / ≥80 tokens, image refs stripped)
    → OpenAI embedding (text-embedding-3-small, 1536d) + BM25 sparse (fastembed)
    → Qdrant upsert with named vectors {dense, bm25} (deterministic UUID5 ids)
-   → hybrid search: dense + sparse, fused with RRF in Qdrant
+   → hybrid search: dense + sparse, fused with RRF in Qdrant (top 30)
+   → Voyage cross-encoder rerank (rerank-2.5) → top N
    → LLM answer with [N] inline citations + chunk-level sources
    → Streamlit chat UI (history, citation cards, debug toggle)
 ```
@@ -29,6 +30,7 @@ data/articles/**/index.md
 | 5a | Eval harness: gold dataset, recall@k, MRR, scripts/eval.py | [done] |
 | 5b | Retrieval improvements (each measured against eval) | [in progress] |
 | 5b.1 | Hybrid search (dense + BM25 sparse, RRF fusion) | [done] |
+| 5b.2 | Cross-encoder rerank (Voyage rerank-2.5) | [done] |
 | 6 | FastAPI + Dockerfiles + SQLite for chat history & feedback | later |
 | 7 | Next.js + shadcn UI | later |
 
@@ -38,6 +40,7 @@ data/articles/**/index.md
 - Qdrant 1.18 (Docker, single container), named vectors `dense` + `bm25`
 - OpenAI `text-embedding-3-small` (1536d, cosine) for dense
 - `fastembed` with `Qdrant/bm25` for sparse (IDF computed server-side by Qdrant)
+- Voyage `rerank-2.5` as cross-encoder reranker (optional; falls back to hybrid-only if `VOYAGE_API_KEY` unset)
 - LLM: `gpt-5.4-mini` (configurable via `LLM_MODEL`)
 - Pydantic v2, pydantic-settings
 - Streamlit (dev/debug UI)
@@ -50,7 +53,7 @@ engineer-rag/
 │   ├── config.py
 │   ├── schemas.py            # Document, Chunk, Citation, RetrievedChunk, QueryResult
 │   ├── ingest/               # loader, chunk, embed, sparse, pipeline
-│   ├── retrieval/            # search (hybrid: dense + BM25 sparse, RRF)
+│   ├── retrieval/            # search (hybrid + Voyage rerank), rerank
 │   ├── generation/           # answer, validator, prompts/answer.md
 │   ├── eval/                 # gold loader, recall@k, MRR
 │   └── storage/              # qdrant
@@ -83,59 +86,48 @@ Corpus is private. The repo ships empty — bring your own articles
 - Re-ingest re-embeds **every** chunk every run (no content-hash dedup yet). Cost is negligible (~$0.0001/run for current corpus), but won't scale.
 - Chunker is paragraph-based, not heading-aware. Sections can leak across chunk boundaries.
 - Image references (`*.webp`, `*.png`) are silently stripped at chunk time. No VLM captioning yet.
-- Retrieval is **hybrid (dense + BM25 sparse, RRF)** — no cross-encoder rerank yet.
+- Retrieval is **hybrid + cross-encoder rerank** (Voyage `rerank-2.5`, top 30 → top N). Falls back to hybrid-only if `VOYAGE_API_KEY` is unset.
 - No persistence: Streamlit chat history resets on refresh.
 - No streaming. Answers appear after full LLM response.
 - Hallucinated `[N]` citations are filtered out of the displayed sources but the answer text isn't rewritten.
 - **No answer-quality metric.** Hallucination rate / faithfulness is unmeasured. Eval only covers retrieval.
 - **Refusal eval is flaky.** OpenAI embeddings have small non-determinism; borderline refusal cases flip between runs. Treat single-run deltas <3% as noise.
 
-## Baseline — current (Phase 5b.1 hybrid, 2026-05-17)
+## Baseline — current (Phase 5b.2 hybrid + Voyage rerank, 2026-05-18)
 
-54 gold questions across 10 articles (50 retrieval + 4 refusal). Hybrid retrieval:
-dense (OpenAI `text-embedding-3-small`) + BM25 sparse (fastembed) fused with RRF.
+54 gold questions across 10 articles (50 retrieval + 4 refusal). Pipeline:
+dense (OpenAI) + BM25 sparse (fastembed) → RRF (top 30) → Voyage `rerank-2.5`
+→ top N.
 
 ```
-Recall@5:        0.920  (46/50)
-Recall@10:       0.960  (48/50)
-MRR:             0.755
+Recall@5:        0.980  (49/50)
+Recall@10:       0.980  (49/50)
+MRR:             0.919
 Refusal-correct: 1.000  (4/4)
 ```
 
-### Previous baselines (for reference)
+~44 of 50 questions now hit at rank 1.
 
-**Phase 5a dense-only (2026-05-17, same corpus + gold set):**
+### Phase progression (same corpus + gold set, 2026-05-17 → 2026-05-18)
 
-```
-Recall@5:        0.780  (39/50)
-Recall@10:       0.860  (43/50)
-MRR:             0.630
-Refusal-correct: 0.750  (3/4)
-```
+| Stage | Recall@5 | Recall@10 | MRR |
+|---|---|---|---|
+| Dense-only (5a baseline) | 0.780 | 0.860 | 0.630 |
+| + Hybrid (5b.1)          | 0.920 | 0.960 | 0.755 |
+| + Voyage rerank (5b.2)   | **0.980** | **0.980** | **0.919** |
 
-Phase 5b.1 (hybrid) lift over dense-only: **+0.140 Recall@5, +0.125 MRR**.
-5 of 7 known misses flipped to hits — exactly the exact-phrase / named-entity
-cases predicted ("bloated tool sets", "Anthropic's definition of an agent",
-"message roles", "METR task length doubling", AGENTS.md multi-chunk).
+5b.2 lift over 5b.1: **+0.060 Recall@5, +0.164 MRR**. Cumulative lift over
+dense-only baseline: **+0.200 Recall@5, +0.289 MRR**.
 
-**Phase 5a, original 2-article baseline (15 questions):** Recall@5 0.929, MRR
-0.828. Kept only for historical context — too small a corpus + gold set to be
-meaningful signal.
+### Soft spots (remaining miss)
 
-### Soft spots (remaining misses)
+Only 1 retrieval miss left:
 
-Only 2 retrieval misses left, both at rank 6–7 — prime cross-encoder rerank
-territory (Phase 5b.2):
-
-- "what is the role of the initializer agent versus the coding agent?" —
-  regressed from rank 7 (dense) to miss (hybrid). BM25 added noise: "agent" and
-  "coding agent" are everywhere in the corpus.
-- "how does Cloudwalk use Codex day to day?" — BM25 didn't boost the rare token
-  "Cloudwalk" enough to overcome Peter's many "codex" matches.
-
-Plus one near-miss kept hitting rank 6–7:
-- "where should hosted shell agents write their artifacts?" — `/mnt/data` is in
-  the right chunk but the chunk is dominated by other tips.
+- "how does Cloudwalk use Codex day to day?" — rerank picked the wrong sibling
+  chunk. `ai-native-engineering-team#4` and `#5` are semantically near-duplicates;
+  Voyage ranked #4 above the chunk that actually mentions Cloudwalk (#5).
+  Diagnosis: chunker boundary ambiguity. Likely fixed by structural chunking
+  (Phase 5b.3).
 
 ## Phase 5b (retrieval improvements)
 
@@ -143,10 +135,12 @@ Each change is a separate experiment; keep what improves the eval baseline.
 
 1. ~~Hybrid search (dense + BM25/sparse + RRF fusion in Qdrant)~~ **[done]** —
    +0.140 Recall@5, +0.125 MRR. Kept.
-2. Cross-encoder rerank (Cohere `rerank-3.5`, top 30 → top 6) **[next]** —
-   target: the 2 remaining misses and the rank 6–7 near-misses.
-3. Structural chunking (split on `##`/`###`, then size-bound) — invalidates
-   existing gold chunk_ids; do after rerank.
+2. ~~Cross-encoder rerank (Voyage `rerank-2.5`, top 30 → top N)~~ **[done]** —
+   +0.060 Recall@5, +0.164 MRR. Kept.
+3. Structural chunking (split on `##`/`###`, then size-bound) **[next]** —
+   invalidates existing gold chunk_ids; will need a label re-sweep with
+   `scripts.inspect` after re-ingest. Target the last remaining miss
+   (Cloudwalk sibling-chunk ambiguity).
 4. Contextual chunk headers (`[Title] > [Section]` prepended).
 5. Image captioning (VLM caption webp/png at ingest, inject before chunking).
 6. Content-hash dedup (skip unchanged articles on re-ingest).

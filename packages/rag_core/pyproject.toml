@@ -13,6 +13,7 @@ dependencies = [
     "python-frontmatter>=1.1",
     "tiktoken>=0.8",
     "fastembed>=0.8.0",
+    "voyageai>=0.3.7",
 ]
 
 [build-system]

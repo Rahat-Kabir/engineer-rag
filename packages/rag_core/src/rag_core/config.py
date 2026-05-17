@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     llm_max_tokens: int = 800
     llm_temperature: float = 0.2
 
+    # Cross-encoder rerank (Phase 5b.2). Leave api key empty to disable.
+    voyage_api_key: str = ""
+    rerank_model: str = "rerank-2.5"
+    rerank_prefetch: int = 30
+
     data_dir: Path = Path("./data")
 
     @property

@@ -152,10 +152,3 @@ replaced (idempotent).
 The project is built phase by phase. For what's done, what's next, and
 what's intentionally not built yet, see
 [`docs/PROGRESS.md`](docs/PROGRESS.md).
-
-## How I work on this
-
-Project-level conventions, locked tech choices, and collaboration rules
-live in [`CLAUDE.md`](CLAUDE.md) (mirrored to
-[`AGENTS.md`](AGENTS.md)). Read either of them if you want to understand
-how decisions get made here.

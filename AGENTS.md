@@ -21,6 +21,8 @@ Folder-based ingest (`data/articles/**/index.md`), not a crawler.
   1536d) + `bm25` (sparse, IDF computed server-side).
 - **Embedder**: OpenAI `text-embedding-3-small` (dense) + `fastembed`
   `Qdrant/bm25` (sparse).
+- **Reranker**: Voyage `rerank-2.5` (optional; off when `VOYAGE_API_KEY`
+  is unset, retrieval falls back to hybrid-only).
 - **LLM**: configurable via `LLM_MODEL` (currently `gpt-5.4-mini`).
 - **UI**: Streamlit (dev/debug). FastAPI + Next.js planned (Phase 6+).
 - **Persistence**: SQLite planned for chat/feedback (Phase 6). No Postgres.
@@ -109,7 +111,8 @@ engineer-rag/
 │           │   ├── sparse.py        # fastembed BM25 sparse vectors
 │           │   └── pipeline.py      # orchestrator: ensure → load → chunk → embed+sparse → upsert
 │           ├── retrieval/
-│           │   └── search.py        # hybrid search: dense + BM25 sparse, fused with RRF (rerank in Phase 5b.2)
+│           │   ├── search.py        # hybrid prefetch → optional Voyage rerank → top N
+│           │   └── rerank.py        # Voyage rerank-2.5 client (no-op fallback if no API key)
 │           ├── generation/
 │           │   ├── answer.py        # answer_question() → QueryResult
 │           │   └── prompts/answer.md
