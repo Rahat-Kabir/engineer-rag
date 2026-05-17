@@ -25,7 +25,9 @@ using LangChain.
 
 - Reads Markdown articles from `data/articles/`; images can sit next to them
   for a later captioning phase.
-- Chunks the text, embeds it with OpenAI, and stores it in Qdrant.
+- Chunks the text, embeds it (OpenAI dense + BM25 sparse), and stores it in Qdrant.
+- Retrieves with hybrid search (dense + BM25, RRF fusion) and optional
+  Voyage cross-encoder reranking.
 - Answers your questions in a Streamlit chat. Answers are expected to cite
   source chunks, with links back to the original articles.
 - Refuses to answer when the corpus doesn't actually cover the question.
@@ -34,7 +36,8 @@ using LangChain.
 
 - No image understanding. Diagrams in articles are ignored at ingest time
   (they'll be captioned by a vision model later).
-- No reranking, no hybrid search. Retrieval is dense-only for now.
+- No answer-quality metric. Retrieval is measured (Recall@k, MRR);
+  generation quality / hallucination rate is not.
 - No persistent chat history. Refreshing the page resets the conversation.
 - No web crawler. Articles are curated by hand, not pulled from URLs.
 
@@ -48,6 +51,9 @@ You'll need:
 - **uv** (Python package manager): [docs.astral.sh/uv/getting-started/installation](https://docs.astral.sh/uv/getting-started/installation/)
 - **Docker** (for Qdrant): [docker.com/get-started](https://www.docker.com/get-started/)
 - An **OpenAI API key**: [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+- (Optional) A **Voyage AI API key** for cross-encoder reranking:
+  [voyageai.com](https://www.voyageai.com/) — 200M tokens free; pipeline
+  falls back to hybrid-only if unset.
 
 ### Run it
 

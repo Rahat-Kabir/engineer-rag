@@ -126,8 +126,7 @@ Only 1 retrieval miss left:
 - "how does Cloudwalk use Codex day to day?" — rerank picked the wrong sibling
   chunk. `ai-native-engineering-team#4` and `#5` are semantically near-duplicates;
   Voyage ranked #4 above the chunk that actually mentions Cloudwalk (#5).
-  Diagnosis: chunker boundary ambiguity. Likely fixed by structural chunking
-  (Phase 5b.3).
+  Diagnosis: chunker boundary ambiguity.
 
 ## Phase 5b (retrieval improvements)
 
@@ -137,13 +136,9 @@ Each change is a separate experiment; keep what improves the eval baseline.
    +0.140 Recall@5, +0.125 MRR. Kept.
 2. ~~Cross-encoder rerank (Voyage `rerank-2.5`, top 30 → top N)~~ **[done]** —
    +0.060 Recall@5, +0.164 MRR. Kept.
-3. Structural chunking (split on `##`/`###`, then size-bound) **[next]** —
-   invalidates existing gold chunk_ids; will need a label re-sweep with
-   `scripts.inspect` after re-ingest. Target the last remaining miss
-   (Cloudwalk sibling-chunk ambiguity).
-4. Contextual chunk headers (`[Title] > [Section]` prepended).
-5. Image captioning (VLM caption webp/png at ingest, inject before chunking).
-6. Content-hash dedup (skip unchanged articles on re-ingest).
+3. Contextual chunk headers (`[Title] > [Section]` prepended).
+4. Image captioning (VLM caption webp/png at ingest, inject before chunking).
+5. Content-hash dedup (skip unchanged articles on re-ingest).
 
 ## Operating commands
 
