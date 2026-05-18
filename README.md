@@ -19,7 +19,7 @@ using LangChain.
 
 ## Screenshot
 
-> _Screenshot coming soon._
+![engineer-rag answering a question with cited sources from multiple articles](assets/demo_question1.png)
 
 ## What it does
 
