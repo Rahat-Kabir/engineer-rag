@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     rerank_model: str = "rerank-2.5"
     rerank_prefetch: int = 30
 
+    # Faithfulness eval (Phase 5c). Anthropic Claude as judge.
+    anthropic_api_key: str = ""
+    judge_model: str = "claude-opus-4-7"
+
     data_dir: Path = Path("./data")
 
     @property
