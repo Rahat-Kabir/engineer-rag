@@ -36,8 +36,9 @@ using LangChain.
 
 - No image understanding. Diagrams in articles are ignored at ingest time
   (they'll be captioned by a vision model later).
-- No answer-quality metric. Retrieval is measured (Recall@k, MRR);
-  generation quality / hallucination rate is not.
+- Generation quality is measured at the claim level (Claude as judge), but the
+  parser still loses some uncited / orphan-marker sentences — graded denominator
+  is smaller than total claims. Numbers are honest, not yet exhaustive.
 - No persistent chat history. Refreshing the page resets the conversation.
 - No web crawler. Articles are curated by hand, not pulled from URLs.
 

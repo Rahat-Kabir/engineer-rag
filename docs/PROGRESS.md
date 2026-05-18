@@ -31,6 +31,7 @@ data/articles/**/index.md
 | 5b | Retrieval improvements (each measured against eval) | [in progress] |
 | 5b.1 | Hybrid search (dense + BM25 sparse, RRF fusion) | [done] |
 | 5b.2 | Cross-encoder rerank (Voyage rerank-2.5) | [done] |
+| 5c | Faithfulness eval (Claude as judge, per-claim grading) | [done] |
 | 6 | FastAPI + Dockerfiles + SQLite for chat history & feedback | later |
 | 7 | Next.js + shadcn UI | later |
 
@@ -41,6 +42,7 @@ data/articles/**/index.md
 - OpenAI `text-embedding-3-small` (1536d, cosine) for dense
 - `fastembed` with `Qdrant/bm25` for sparse (IDF computed server-side by Qdrant)
 - Voyage `rerank-2.5` as cross-encoder reranker (optional; falls back to hybrid-only if `VOYAGE_API_KEY` unset)
+- Claude (`claude-opus-4-7` default, `claude-sonnet-4-6` cheaper) as faithfulness judge — cross-family to avoid same-model bias
 - LLM: `gpt-5.4-mini` (configurable via `LLM_MODEL`)
 - Pydantic v2, pydantic-settings
 - Streamlit (dev/debug UI)
@@ -54,11 +56,12 @@ engineer-rag/
 │   ├── schemas.py            # Document, Chunk, Citation, RetrievedChunk, QueryResult
 │   ├── ingest/               # loader, chunk, embed, sparse, pipeline
 │   ├── retrieval/            # search (hybrid + Voyage rerank), rerank
+│   ├── eval/                 # gold loader, retrieval metrics, faithfulness
 │   ├── generation/           # answer, validator, prompts/answer.md
 │   ├── eval/                 # gold loader, recall@k, MRR
 │   └── storage/              # qdrant
 ├── apps/ui_streamlit/src/ui_streamlit/app.py
-├── scripts/                  # ingest.py, query.py, eval.py, inspect.py
+├── scripts/                  # ingest.py, query.py, eval.py, eval_faithfulness.py, inspect.py
 ├── data/
 │   ├── articles/             # README + your articles (corpus folders gitignored)
 │   └── eval/gold.jsonl       # 54 gold questions
@@ -90,8 +93,8 @@ Corpus is private. The repo ships empty — bring your own articles
 - No persistence: Streamlit chat history resets on refresh.
 - No streaming. Answers appear after full LLM response.
 - Hallucinated `[N]` citations are filtered out of the displayed sources but the answer text isn't rewritten.
-- **No answer-quality metric.** Hallucination rate / faithfulness is unmeasured. Eval only covers retrieval.
 - **Refusal eval is flaky.** OpenAI embeddings have small non-determinism; borderline refusal cases flip between runs. Treat single-run deltas <3% as noise.
+- **Faithfulness eval has parser noise.** ~30% of LLM-formatted lines are either marker-only orphans or uncited sentences. These are surfaced separately (`parse_skipped`, `uncited`) so they don't pollute the hallucination rate, but they reduce the effective denominator (graded claims ≈ 66 / ~85 candidates).
 
 ## Baseline — current (Phase 5b.2 hybrid + Voyage rerank, 2026-05-18)
 
@@ -127,6 +130,30 @@ Only 1 retrieval miss left:
   chunk. `ai-native-engineering-team#4` and `#5` are semantically near-duplicates;
   Voyage ranked #4 above the chunk that actually mentions Cloudwalk (#5).
   Diagnosis: chunker boundary ambiguity.
+
+## Faithfulness baseline (Phase 5c, 2026-05-18)
+
+Same 50 retrieval gold questions, judged per-claim by Claude (`claude-sonnet-4-6`).
+Answer prompt tightened to require inline citations and forbid uncited factual
+sentences.
+
+```
+Per-claim (N = 66 graded claims):
+  Supported:    0.788  (52 / 66)
+  Partial:      0.182  (12 / 66)
+  Unsupported:  0.030  (2 / 66)    ← hallucination rate
+
+Per-answer (N = 43 answered, 7 produced no gradable claims):
+  Fully grounded:     0.698  (30 / 43)
+  Has hallucination:  0.047  (2 / 43)
+
+Parser quality:
+  Parse-skipped:  28   (orphan citation markers — fixed in code; LLM still produces some)
+  Uncited:        46   (sentences with no [N] marker — flagged, not graded)
+```
+
+Two real hallucinations caught — both wrong-citation cases (claim attributed to
+wrong source chunk). Exactly the class of bug this eval was built to surface.
 
 ## Phase 5b (retrieval improvements)
 

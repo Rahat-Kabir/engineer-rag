@@ -23,6 +23,8 @@ Folder-based ingest (`data/articles/**/index.md`), not a crawler.
   `Qdrant/bm25` (sparse).
 - **Reranker**: Voyage `rerank-2.5` (optional; off when `VOYAGE_API_KEY`
   is unset, retrieval falls back to hybrid-only).
+- **Faithfulness judge**: Anthropic Claude (`claude-opus-4-7` default,
+  `claude-sonnet-4-6` cheaper) — cross-family to avoid same-model bias.
 - **LLM**: configurable via `LLM_MODEL` (currently `gpt-5.4-mini`).
 - **UI**: Streamlit (dev/debug). FastAPI + Next.js planned (Phase 6+).
 - **Persistence**: SQLite planned for chat/feedback (Phase 6). No Postgres.
@@ -113,6 +115,9 @@ engineer-rag/
 │           ├── retrieval/
 │           │   ├── search.py        # hybrid prefetch → optional Voyage rerank → top N
 │           │   └── rerank.py        # Voyage rerank-2.5 client (no-op fallback if no API key)
+│           ├── eval/
+│           │   ├── run.py           # retrieval eval (recall@k, MRR, refusal)
+│           │   └── faithfulness.py  # per-claim grounding via Claude judge
 │           ├── generation/
 │           │   ├── answer.py        # answer_question() → QueryResult
 │           │   └── prompts/answer.md
@@ -131,6 +136,7 @@ engineer-rag/
     ├── ingest.py                    # uv run python -m scripts.ingest
     ├── query.py                     # uv run python -m scripts.query "..."
     ├── eval.py                      # uv run python -m scripts.eval
+    ├── eval_faithfulness.py         # uv run python -m scripts.eval_faithfulness
     └── inspect.py                   # uv run python -m scripts.inspect {docs|chunks|chunk}
 ```
 
