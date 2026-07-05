@@ -1,6 +1,6 @@
 # engineer-rag — progress
 
-_Last updated: 2026-05-18_
+_Last updated: 2026-07-06_
 
 ## What's working today
 
@@ -58,7 +58,6 @@ engineer-rag/
 │   ├── retrieval/            # search (hybrid + Voyage rerank), rerank
 │   ├── eval/                 # gold loader, retrieval metrics, faithfulness
 │   ├── generation/           # answer, validator, prompts/answer.md
-│   ├── eval/                 # gold loader, recall@k, MRR
 │   └── storage/              # qdrant
 ├── apps/ui_streamlit/src/ui_streamlit/app.py
 ├── scripts/                  # ingest.py, query.py, eval.py, eval_faithfulness.py, inspect.py
@@ -163,9 +162,31 @@ Each change is a separate experiment; keep what improves the eval baseline.
    +0.140 Recall@5, +0.125 MRR. Kept.
 2. ~~Cross-encoder rerank (Voyage `rerank-2.5`, top 30 → top N)~~ **[done]** —
    +0.060 Recall@5, +0.164 MRR. Kept.
-3. Contextual chunk headers (`[Title] > [Section]` prepended).
-4. Image captioning (VLM caption webp/png at ingest, inject before chunking).
-5. Content-hash dedup (skip unchanged articles on re-ingest).
+3. Contextual chunk headers (`[Title] > [Section]` prepended) — **next**;
+   targets the one remaining miss.
+4. Image captioning — **deferred**: corpus has only 2 images, nothing to
+   measure. Revisit when image-heavy articles land.
+5. Content-hash dedup — do when corpus growth makes re-ingest cost matter.
+
+## Next up (planned 2026-07-06)
+
+Retrieval eval is saturated (Recall@5 0.980, one miss left), so the plan
+shifts axis after one last retrieval slice:
+
+1. **5b.3 contextual chunk headers** — measure against eval, keep or revert.
+   Closes Phase 5b.
+2. **Phase 4 tests** — modules are stable now. Pure functions first: chunker,
+   citation validator, loader, eval metrics. Safety net before the Phase 6
+   refactor.
+3. **Phase 6 (main arc)** — FastAPI (`POST /query` + SSE streaming) → SQLite
+   chat history → feedback endpoint. Streamlit stays as debug UI. Unblocks
+   Phase 7 (Next.js).
+4. **Ongoing** — grow corpus and gold set together; that restores eval
+   headroom and makes future retrieval ideas measurable again.
+
+Deferred: image captioning (see above), further retrieval tuning (no
+measurable headroom), faithfulness prompt iteration (hard-hallucination
+rate already ~3%; revisit the 46 uncited sentences later).
 
 ## Operating commands
 
