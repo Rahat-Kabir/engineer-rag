@@ -1,67 +1,89 @@
 # engineer-rag
 
-Ask your favorite engineering blogs questions, and get grounded answers
-back, with citations to the exact paragraph each claim came from.
+A reference implementation of **eval-driven RAG, built from primitives** — no
+LangChain, no LlamaIndex. Hybrid retrieval, cross-encoder reranking, and
+cited answers over a hand-curated corpus, wrapped in the eval harness that
+proves every piece earns its place.
 
-## Why this exists
-
-I read a lot of engineering blogs (Anthropic, OpenAI, Netflix,Langchain,ManusAI, papers, my
-own notes) and forget most of them. Generic chatbots hallucinate when I
-ask about specifics. Bookmarks rot.
-
-So I built a small RAG system over a corpus I curate by hand. The point
-is one thing: answering technical questions with citations I can actually
-trust.
-
-It's also where I'm learning the parts of RAG that matter, chunking,
-retrieval quality, evaluation, by building them from scratch instead of
-using LangChain.
-
-## Screenshot
+Ask a question about the ingested articles and you get an answer with
+citations to the exact paragraph each claim came from — or a refusal when the
+corpus doesn't cover it.
 
 ![engineer-rag answering a question with cited sources from multiple articles](assets/demo_question1.png)
 
-## What it does
+## The pipeline
 
-- Reads Markdown articles from `data/articles/`; images can sit next to them
-  for a later captioning phase.
-- Chunks the text, embeds it (OpenAI dense + BM25 sparse), and stores it in Qdrant.
-- Retrieves with hybrid search (dense + BM25, RRF fusion) and optional
-  Voyage cross-encoder reranking.
-- Answers your questions in a Streamlit chat. Answers are expected to cite
-  source chunks, with links back to the original articles.
-- Refuses to answer when the corpus doesn't actually cover the question.
+```mermaid
+flowchart LR
+    subgraph Ingest
+        A["markdown articles<br/>+ frontmatter"] --> B["paragraph chunker<br/>&le;500 tokens"]
+        B --> C["dense embeddings<br/>OpenAI, 1536d"]
+        B --> D["sparse BM25<br/>fastembed"]
+    end
+    C --> E[("Qdrant<br/>named vectors")]
+    D --> E
+    subgraph Answer
+        H["hybrid search<br/>dense + BM25 &rarr; RRF"] --> R["cross-encoder rerank<br/>Voyage, optional"]
+        R --> G["LLM answer with<br/>inline citations"]
+    end
+    E --> H
+    V1["retrieval eval:<br/>recall@k, MRR, refusal"] -. measures .-> H
+    V2["faithfulness eval:<br/>Claude judges each claim"] -. grades .-> G
+```
 
-## What it doesn't do (yet)
+All the real logic lives in `packages/rag_core/` — small, readable modules.
+The Streamlit chat UI and the CLI scripts are thin wrappers around it.
 
-- No image understanding. Diagrams in articles are ignored at ingest time
-  (they'll be captioned by a vision model later).
-- Generation quality is measured at the claim level (Claude as judge), but the
-  parser still loses some uncited / orphan-marker sentences — graded denominator
-  is smaller than total claims. Numbers are honest, not yet exhaustive.
-- No persistent chat history. Refreshing the page resets the conversation.
-- No web crawler. Articles are curated by hand, not pulled from URLs.
+## Measured, not vibed
+
+Every retrieval change in this repo was an experiment against a gold set of
+questions, kept only if the baseline improved. This is the pipeline's actual
+history (54-question gold set over a 10-article curated corpus):
+
+| Retrieval stage               | Recall@5  | Recall@10 | MRR       |
+| ----------------------------- | --------- | --------- | --------- |
+| Dense-only                    | 0.780     | 0.860     | 0.630     |
+| + BM25 hybrid, RRF fusion     | 0.920     | 0.960     | 0.755     |
+| + Voyage cross-encoder rerank | **0.980** | **0.980** | **0.919** |
+
+Generation is graded too: Claude judges each parsed cited claim — cross-family
+on purpose to reduce same-model bias. Current numbers: 66 graded claims,
+**78.8% supported, 3.0% contradicting their cited source**.
+
+**Reproduce it yourself.** The repo ships a committed demo corpus and gold
+set, so the eval runs on any machine for pennies:
+
+```powershell
+uv run python -m scripts.ingest   # demo corpus: 11 articles, 33 chunks
+uv run python -m scripts.eval     # expect: Recall@5 1.000, MRR ~0.97, refusal 1/4
+```
+
+That refusal number is a deliberately shipped finding, not an eval bug: the
+demo gold set contains refusal-bait questions — topics the corpus mentions
+but never explains — and the current answer prompt fails three of four. The
+weakness and its planned fix are documented in
+[`docs/PROGRESS.md`](docs/PROGRESS.md). A reference repo that only publishes
+its wins isn't one.
 
 ## Quick start
 
 ### Prerequisites
 
-You'll need:
-
 - **Python 3.12+**: [python.org/downloads](https://www.python.org/downloads/)
-- **uv** (Python package manager): [docs.astral.sh/uv/getting-started/installation](https://docs.astral.sh/uv/getting-started/installation/)
+- **uv**: [docs.astral.sh/uv/getting-started/installation](https://docs.astral.sh/uv/getting-started/installation/)
 - **Docker** (for Qdrant): [docker.com/get-started](https://www.docker.com/get-started/)
-- An **OpenAI API key**: [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
-- (Optional) A **Voyage AI API key** for cross-encoder reranking:
-  [voyageai.com](https://www.voyageai.com/) — 200M tokens free; pipeline
-  falls back to hybrid-only if unset.
+- An **OpenAI API key** (embeddings + answers):
+  [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+- Optional: a **Voyage AI key** for reranking (falls back to hybrid-only if
+  unset) and an **Anthropic key** for the faithfulness judge (only used by
+  `scripts.eval_faithfulness`).
 
 ### Run it
 
 ```powershell
-# 1. Set your API key
-copy .env.example .env        # Windows (PowerShell). macOS / Linux: cp .env.example .env
-# then open .env and paste your OPENAI_API_KEY
+# 1. Configure
+copy .env.example .env        # macOS / Linux: cp .env.example .env
+#    then open .env and paste your OPENAI_API_KEY
 
 # 2. Install dependencies
 uv sync
@@ -69,24 +91,20 @@ uv sync
 # 3. Start the vector database
 docker compose up -d qdrant
 
-# 4. Ingest the demo corpus (synthetic articles committed in data/articles_demo/)
+# 4. Ingest the committed demo corpus (11 synthetic articles)
 uv run python -m scripts.ingest
 
-#    ...or use your own articles: drop them in data/articles/
-#    (see "Adding a new article" below) and switch the profile
-uv run python -m scripts.ingest --private
+# 5. Run the retrieval eval — reproduce the numbers above
+uv run python -m scripts.eval
 
-# 5. Open the chat UI
+# 6. Open the chat UI
 uv run streamlit run apps/ui_streamlit/src/ui_streamlit/app.py
 ```
 
-The UI opens at **http://localhost:8501**. Ask a question; you'll get an
-answer with `[1]`, `[2]` citations and clickable source cards.
-
-Prefer the command line?
+The UI opens at **http://localhost:8501**. Prefer the command line?
 
 ```powershell
-uv run python -m scripts.query "what is context rot?"
+uv run python -m scripts.query "what caused Arbiter to issue duplicate refunds?"
 ```
 
 ## Demo corpus vs your corpus
@@ -101,19 +119,34 @@ The repo works with two corpora, selected by `CORPUS_PROFILE` in `.env` or a
 | Gold set          | `data/eval/demo-gold.jsonl`                  | `data/eval/private-gold.jsonl`       |
 
 The profile picks all three **together**, so an eval can never accidentally
-run against the wrong corpus. The demo corpus is synthetic — fictional
-companies, original writing — so it can be committed without copyright
-issues, and its gold set makes both evals reproducible on any machine:
+run against the wrong corpus.
 
-```powershell
-uv run python -m scripts.eval                 # demo corpus (default)
-uv run python -m scripts.eval --private      # your corpus
-```
+The demo corpus is 11 articles about three fictional engineering companies
+and one opinionated fictional blogger, written with deliberate eval traps —
+multi-source facts split across documents, explicit disagreements between
+sources, near-duplicate sibling sections, and refusal bait. Being fiction, it
+can be committed without copyright issues; being engineered, it makes the
+eval mean something. See
+[`data/articles_demo/README.md`](data/articles_demo/README.md).
 
-> **Status:** the demo articles are currently being written; until they land,
-> the demo corpus ingests zero documents.
+## Design decisions
 
-## Adding a new article
+- **No LangChain / LlamaIndex.** The point is learning what frameworks hide.
+  Every stage is a small module you can read in one sitting.
+- **Folder-based ingest, never a crawler.** The corpus is curated by hand;
+  quality of the source set matters more than its size.
+- **Every retrieval change is an experiment.** Measured against the gold set,
+  kept only if the baseline improves.
+- **Reranker optional by design.** No `VOYAGE_API_KEY` → retrieval degrades
+  gracefully to hybrid-only instead of failing.
+- **Cross-family faithfulness judge.** Claude grades GPT answers to avoid
+  same-model bias.
+- **Idempotent ingest.** Deterministic chunk IDs and UUID5 point IDs;
+  re-running ingest is always safe.
+- **Synthetic demo corpus.** Original fiction — committable without copyright
+  risk, and engineered to exercise retrieval rather than flatter it.
+
+## Bring your own corpus
 
 Articles you add are your **private corpus**: they live in `data/articles/`,
 stay local (gitignored), and are used when you run with `--private` or
@@ -122,18 +155,15 @@ stay local (gitignored), and are used when you run with `--private` or
 ### The one rule
 
 Any file named exactly `index.md`, anywhere under `data/articles/`, gets
-ingested. The folder structure is your choice. Organize by company, topic,
+ingested. The folder structure is your choice — organize by company, topic,
 year, whatever fits.
 
 | Path                                               | Ingested?                 |
 | -------------------------------------------------- | ------------------------- |
 | `data/articles/my-note/index.md`                   | yes                       |
 | `data/articles/companies/anthropic/post1/index.md` | yes                       |
-| `data/articles/papers/attention/index.md`          | yes                       |
-| `data/articles/personal/2026/journal/index.md`     | yes                       |
 | `data/articles/random/deeply/nested/path/index.md` | yes                       |
 | `data/articles/foo.md`                             | no (not named `index.md`) |
-| `data/articles/notes.txt`                          | no (not markdown)         |
 | `data/articles/INDEX.md`                           | no (case matters)         |
 
 ### Format
@@ -164,8 +194,7 @@ company: openai # optional
 Article body here...
 ```
 
-Only `title` is recommended, and even that falls back to the folder name if
-you skip it.
+Only `title` is recommended, and even that falls back to the folder name.
 
 ### Then re-run ingest
 
@@ -173,21 +202,35 @@ you skip it.
 uv run python -m scripts.ingest --private
 ```
 
-The script walks `data/articles/`, finds every `index.md`, chunks it, embeds
-it, and stores it in Qdrant. Re-running is safe — existing chunks are
-replaced (idempotent).
+Re-running is safe — existing chunks are replaced (idempotent).
 
-## Architecture in 30 seconds
+## What it doesn't do (yet)
 
-- **Folder-based ingest, not a crawler.** The corpus is something I tend by
-  hand. Quality of the source set matters more than its size.
-- **`packages/rag_core/` is the brain.** All the real logic (ingest,
-  retrieval, generation, citations) lives there. Everything in `apps/`
-  (Streamlit today, FastAPI + Next.js later) is a thin wrapper that calls
-  into `rag_core`.
+- **Near-topic refusals are weak.** The demo eval's refusal-bait questions
+  fail 3/4 — the model stretches an answer from adjacent chunks instead of
+  refusing. A prompt experiment is queued.
+- **No image understanding.** Diagrams are stripped at ingest time; VLM
+  captioning is deferred until image-heavy articles land.
+- **The claim parser loses some sentences.** Uncited and orphan-marker
+  sentences are flagged separately so they don't pollute the hallucination
+  rate, but the graded denominator is smaller than the total. Numbers are
+  honest, not exhaustive.
+- **No persistent chat history.** Refreshing the Streamlit page resets the
+  conversation. SQLite persistence is planned with the FastAPI phase.
+- **No HTTP API yet.** The UI imports `rag_core` directly; FastAPI + SSE
+  streaming is the next major arc.
+
+## Why this exists
+
+I read a lot of engineering blogs (Anthropic, OpenAI, papers, my own notes)
+and forget most of them. Generic chatbots hallucinate when I ask about
+specifics; bookmarks rot. So I built the thing I wanted — grounded answers
+with citations I can actually check, over a corpus I curate by hand — and
+used it to learn, by building from scratch, the parts of RAG that actually
+matter: chunking, retrieval quality, evaluation.
 
 ## Status & roadmap
 
-The project is built phase by phase. For what's done, what's next, and
-what's intentionally not built yet, see
+The project is built phase by phase. For what's done, what's next, what each
+phase measured, and what's intentionally not built yet, see
 [`docs/PROGRESS.md`](docs/PROGRESS.md).

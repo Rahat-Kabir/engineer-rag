@@ -74,7 +74,7 @@ Non-obvious files only — the tree itself is self-explanatory (Glob it).
 | `packages/rag_core/src/rag_core/ingest/pipeline.py` | 30 | Ingest orchestrator: ensure → load → chunk → embed+sparse → upsert |
 | `packages/rag_core/src/rag_core/retrieval/search.py` | 25 | Hybrid prefetch → RRF → optional Voyage rerank → top N |
 | `packages/rag_core/src/rag_core/eval/faithfulness.py` | 325 | Per-claim grounding judge (Claude), parse/skip bookkeeping |
-| `data/eval/private-gold.jsonl` | 54 items | Private-corpus gold questions `{question, expected_chunk_ids}`; empty list = refusal case. `demo-gold.jsonl` is the demo-corpus set (growing with the demo articles) |
+| `data/eval/private-gold.jsonl` | 54 items | Private-corpus gold questions `{question, expected_chunk_ids}`; empty list = refusal case. `demo-gold.jsonl` is the demo-corpus set (39 items incl. trap questions) |
 
 ## Commands
 

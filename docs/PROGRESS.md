@@ -89,12 +89,13 @@ collections can never be mismatched. Demo is the built-in default so a fresh
 clone works out of the box.
 
 - **Wiring**: done (2026-07-16).
-- **Demo articles + demo gold set**: not written yet. Plan: ~10–12 synthetic
-  articles (fictional companies, original writing) engineered to exercise
-  retrieval — multi-hop facts split across documents, deliberate
-  disagreements between articles, near-duplicate sibling sections (reranker
-  stress), and refusal bait. All baselines below are **private-corpus**
-  numbers.
+- **Demo corpus**: done (2026-07-16). 11 synthetic articles / 33 chunks across
+  three fictional companies (Relay Systems, Corelight Labs, Ferrostack) and a
+  fictional staff engineer's blog (Mira Chen), engineered with eval traps:
+  multi-source facts split across documents, deliberate disagreements between
+  articles, near-duplicate sibling sections (reranker stress), and refusal
+  bait (topics mentioned but never explained). Demo gold set: 39 questions
+  (35 retrieval + 4 refusal). Baseline below.
 
 The private corpus itself stays as before: curated by hand, local only
 (see project `README.md` → "Adding a new article").
@@ -119,6 +120,28 @@ The private corpus itself stays as before: curated by hand, local only
 - Hallucinated `[N]` citations are filtered out of the displayed sources but the answer text isn't rewritten.
 - **Refusal eval is flaky.** OpenAI embeddings have small non-determinism; borderline refusal cases flip between runs. Treat single-run deltas <3% as noise.
 - **Faithfulness eval has parser noise.** ~30% of LLM-formatted lines are either marker-only orphans or uncited sentences. These are surfaced separately (`parse_skipped`, `uncited`) so they don't pollute the hallucination rate, but they reduce the effective denominator (graded claims ≈ 66 / ~85 candidates).
+
+## Demo corpus baseline (2026-07-16)
+
+**Demo corpus** (11 articles / 33 chunks, `data/eval/demo-gold.jsonl` 39
+questions, collection `articles_demo`). Pipeline: hybrid + Voyage rerank,
+same as private. Reproducible by anyone: `scripts.ingest --demo` then
+`scripts.eval --demo`.
+
+```
+Recall@5:        1.000  (35/35)
+Recall@10:       1.000  (35/35)
+MRR:             0.971  (33 of 35 at rank 1)
+Refusal-correct: 0.250  (1/4)
+```
+
+The refusal number is the honest finding: all three refusal-*bait* questions
+(topics the corpus mentions but never explains, e.g. Ferrostack's
+"Forgeglass" pipeline) were answered with citations instead of the refusal
+sentence. The answer prompt resists out-of-domain questions but not
+near-topic ones. Targeted fix: a prompt experiment (generation change →
+re-run faithfulness per Definition of Done). Retrieval saturating at 33
+chunks is expected — the demo corpus is for reproducibility, not headroom.
 
 ## Baseline — current (Phase 5b.2 hybrid + Voyage rerank, 2026-05-18)
 
@@ -201,19 +224,21 @@ Project direction settled: **the repo is the product** — a reference
 implementation of eval-driven RAG that anyone can clone, run, and reproduce.
 Retrieval eval is saturated (Recall@5 0.980, one miss left), so the order is:
 
-1. **Demo corpus content** — write the ~10–12 synthetic articles
-   (fictional companies, engineered eval traps) + the demo gold set, so
-   "clone and it works" becomes true. The two-profile wiring is already done
-   (see "Corpora" above).
-2. **5b.3 contextual chunk headers** — measure against eval, keep or revert.
+1. ~~Demo corpus content~~ **[done 2026-07-16]** — 11 articles, 39-question
+   gold set, baseline recorded. "Clone and it works" is true.
+2. **README rewrite** — reposition around the eval story (measured pipeline
+   progression + reproducible demo numbers). Skeleton agreed.
+3. **Refusal prompt experiment** — demo baseline exposed near-topic refusal
+   failures (1/4). Generation change → re-run faithfulness per DoD.
+4. **5b.3 contextual chunk headers** — measure against eval, keep or revert.
    Closes Phase 5b.
-3. **Phase 4 tests** — modules are stable now. Pure functions first: chunker,
+5. **Phase 4 tests** — modules are stable now. Pure functions first: chunker,
    citation validator, loader, eval metrics. Safety net before the Phase 6
    refactor.
-4. **Phase 6 (main arc)** — FastAPI (`POST /query` + SSE streaming) → SQLite
+6. **Phase 6 (main arc)** — FastAPI (`POST /query` + SSE streaming) → SQLite
    chat history → feedback endpoint. Streamlit stays as debug UI. Unblocks
    Phase 7 (Next.js).
-5. **Ongoing** — grow the private corpus and gold set together; that restores
+7. **Ongoing** — grow the private corpus and gold set together; that restores
    eval headroom and makes future retrieval ideas measurable again.
 
 Deferred: image captioning (see above), further retrieval tuning (no
