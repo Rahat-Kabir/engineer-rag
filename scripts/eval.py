@@ -1,9 +1,8 @@
 from __future__ import annotations
-from pathlib import Path
 
+from rag_core.config import settings
 from rag_core.eval.run import EvalSummary, QuestionResult, run_eval
-
-GOLD_PATH = Path("data/eval/gold.jsonl")
+from scripts._profile import apply_corpus_profile_flag
 
 
 def _print_per_question(per_question: list[QuestionResult]) -> None:
@@ -42,11 +41,17 @@ def _print_summary(s: EvalSummary) -> None:
 
 
 def main() -> None:
-    if not GOLD_PATH.exists():
-        print(f"Gold file not found: {GOLD_PATH}")
+    apply_corpus_profile_flag()
+    gold_path = settings.gold_path
+    if not gold_path.exists():
+        print(f"Gold file not found: {gold_path}")
         raise SystemExit(1)
 
-    summary = run_eval(GOLD_PATH, top_k=10)
+    print(
+        f"Corpus: {settings.corpus_profile} — gold set: {gold_path}, "
+        f"collection: '{settings.qdrant_collection}'\n"
+    )
+    summary = run_eval(gold_path, top_k=10)
     _print_summary(summary)
     _print_per_question(summary.per_question)
 

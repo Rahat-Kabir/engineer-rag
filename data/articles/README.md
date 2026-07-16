@@ -1,7 +1,12 @@
 # data/articles/
 
-Your corpus lives here. The ingest pipeline walks this folder, finds every
-`index.md`, and turns each one into a retrievable article.
+Your **private corpus** lives here. The ingest pipeline walks this folder,
+finds every `index.md`, and turns each one into a retrievable article.
+
+Everything in this folder except this README is gitignored — your articles
+stay on your machine. Commands use this corpus when run with `--private` or
+`CORPUS_PROFILE=private`; the committed demo corpus lives in
+[`data/articles_demo/`](../articles_demo/README.md) and is the default.
 
 ## Example
 

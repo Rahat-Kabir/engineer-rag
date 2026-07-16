@@ -4,6 +4,9 @@ Usage:
     uv run python -m scripts.inspect docs
     uv run python -m scripts.inspect chunks <doc_id>
     uv run python -m scripts.inspect chunk  <chunk_id>
+
+All commands accept --demo / --private to pick the corpus
+(default: demo, or CORPUS_PROFILE in .env).
 """
 from __future__ import annotations
 import sys
@@ -16,6 +19,7 @@ from qdrant_client.models import Filter, FieldCondition, MatchValue
 
 from rag_core.config import settings
 from rag_core.storage.qdrant import _client
+from scripts._profile import apply_corpus_profile_flag
 
 
 def _scroll_all(flt: Filter | None = None) -> list[dict]:
@@ -83,6 +87,7 @@ def cmd_chunk(chunk_id: str) -> None:
 
 
 def main() -> None:
+    apply_corpus_profile_flag()
     args = sys.argv[1:]
     if not args:
         print(__doc__)

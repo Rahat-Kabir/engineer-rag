@@ -5,14 +5,13 @@ Usage:
 """
 from __future__ import annotations
 import sys
-from pathlib import Path
 
+from rag_core.config import settings
 from rag_core.eval.faithfulness import FaithfulnessSummary, run_faithfulness
+from scripts._profile import apply_corpus_profile_flag
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-
-GOLD_PATH = Path("data/eval/gold.jsonl")
 
 
 def _print_summary(s: FaithfulnessSummary) -> None:
@@ -59,14 +58,20 @@ def _print_bad_cases(s: FaithfulnessSummary) -> None:
 
 
 def main() -> None:
-    if not GOLD_PATH.exists():
-        print(f"Gold file not found: {GOLD_PATH}")
+    apply_corpus_profile_flag()
+    gold_path = settings.gold_path
+    if not gold_path.exists():
+        print(f"Gold file not found: {gold_path}")
         raise SystemExit(1)
 
+    print(
+        f"Corpus: {settings.corpus_profile} — gold set: {gold_path}, "
+        f"collection: '{settings.qdrant_collection}'"
+    )
     print("Running faithfulness eval. This calls Claude as judge for each cited claim.")
     print("Expect 1–2 minutes for 50 questions.\n")
 
-    summary = run_faithfulness(GOLD_PATH, top_k=6)
+    summary = run_faithfulness(gold_path, top_k=6)
     _print_summary(summary)
     _print_bad_cases(summary)
 

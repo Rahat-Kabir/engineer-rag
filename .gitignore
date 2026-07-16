@@ -38,6 +38,9 @@ qdrant_storage/
 # Logs
 *.log
 
-# Third-party article copies (kept local only — see README for adding your own)
-data/articles/companies/
-data/articles/person/
+# Private corpus (kept local only — the committed demo corpus lives in data/articles_demo/)
+data/articles/*
+!data/articles/README.md
+
+# Private gold set stays tracked (data/eval/private-gold.jsonl) — it references
+# private chunk ids but contains no article content.

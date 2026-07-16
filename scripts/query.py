@@ -1,11 +1,13 @@
 import sys
 
 from rag_core.generation.answer import answer_question
+from scripts._profile import apply_corpus_profile_flag
 
 
 def main() -> None:
+    apply_corpus_profile_flag()
     if len(sys.argv) < 2:
-        print('Usage: python -m scripts.query "your question"')
+        print('Usage: python -m scripts.query "your question" [--demo | --private]')
         sys.exit(1)
     question = " ".join(sys.argv[1:])
 

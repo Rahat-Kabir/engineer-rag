@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,7 +13,13 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
 
     qdrant_url: str = "http://localhost:6333"
-    qdrant_collection: str = "articles"
+
+    # Which corpus every command runs against. "demo" is the default so a
+    # fresh clone works out of the box; set CORPUS_PROFILE=private in .env
+    # (or pass --private to any script) to use your own local corpus.
+    # The profile derives articles dir + Qdrant collection + gold file
+    # together (properties below) so the three can never be mismatched.
+    corpus_profile: Literal["demo", "private"] = "demo"
 
     embed_model: str = "text-embedding-3-small"
     embed_dim: int = 1536
@@ -34,7 +41,21 @@ class Settings(BaseSettings):
 
     @property
     def articles_dir(self) -> Path:
-        return self.data_dir / "articles"
+        if self.corpus_profile == "private":
+            return self.data_dir / "articles"
+        return self.data_dir / "articles_demo"
+
+    @property
+    def qdrant_collection(self) -> str:
+        if self.corpus_profile == "private":
+            return "articles"
+        return "articles_demo"
+
+    @property
+    def gold_path(self) -> Path:
+        if self.corpus_profile == "private":
+            return self.data_dir / "eval" / "private-gold.jsonl"
+        return self.data_dir / "eval" / "demo-gold.jsonl"
 
 
 settings = Settings()

@@ -1,6 +1,6 @@
 # engineer-rag — progress
 
-_Last updated: 2026-07-06_
+_Last updated: 2026-07-16_
 
 ## What's working today
 
@@ -62,16 +62,41 @@ engineer-rag/
 ├── apps/ui_streamlit/src/ui_streamlit/app.py
 ├── scripts/                  # ingest.py, query.py, eval.py, eval_faithfulness.py, inspect.py
 ├── data/
-│   ├── articles/             # README + your articles (corpus folders gitignored)
-│   └── eval/gold.jsonl       # 54 gold questions
+│   ├── articles/             # private corpus (gitignored; only README in git)
+│   ├── articles_demo/        # demo corpus (committed, synthetic; being written)
+│   └── eval/                 # demo-gold.jsonl (growing) + private-gold.jsonl (54 questions)
 ├── docker-compose.yml        # qdrant only
 ├── pyproject.toml            # workspace root
 └── .env / .env.example
 ```
 
-## Corpus
+## Corpora — two-profile system (2026-07-16)
 
-Corpus is private. The repo ships empty — bring your own articles
+The project direction is **repo-as-reference**: someone who clones it should
+be able to ingest, query, and reproduce the eval numbers without bringing any
+data. To make that possible without republishing copyrighted articles, there
+are two corpora, selected by `CORPUS_PROFILE` (`.env`) or `--demo`/`--private`
+on any script:
+
+| | Demo (default) | Private |
+|---|---|---|
+| Articles | `data/articles_demo/` (committed, synthetic) | `data/articles/` (local, gitignored) |
+| Qdrant collection | `articles_demo` | `articles` |
+| Gold set | `data/eval/demo-gold.jsonl` | `data/eval/private-gold.jsonl` |
+
+The profile derives all three together in `config.py`, so gold sets and
+collections can never be mismatched. Demo is the built-in default so a fresh
+clone works out of the box.
+
+- **Wiring**: done (2026-07-16).
+- **Demo articles + demo gold set**: not written yet. Plan: ~10–12 synthetic
+  articles (fictional companies, original writing) engineered to exercise
+  retrieval — multi-hop facts split across documents, deliberate
+  disagreements between articles, near-duplicate sibling sections (reranker
+  stress), and refusal bait. All baselines below are **private-corpus**
+  numbers.
+
+The private corpus itself stays as before: curated by hand, local only
 (see project `README.md` → "Adding a new article").
 
 ## Key decisions made
@@ -97,7 +122,8 @@ Corpus is private. The repo ships empty — bring your own articles
 
 ## Baseline — current (Phase 5b.2 hybrid + Voyage rerank, 2026-05-18)
 
-54 gold questions across 10 articles (50 retrieval + 4 refusal). Pipeline:
+**Private corpus** (10 articles, `data/eval/private-gold.jsonl`, collection
+`articles`). 54 gold questions (50 retrieval + 4 refusal). Pipeline:
 dense (OpenAI) + BM25 sparse (fastembed) → RRF (top 30) → Voyage `rerank-2.5`
 → top N.
 
@@ -132,7 +158,8 @@ Only 1 retrieval miss left:
 
 ## Faithfulness baseline (Phase 5c, 2026-05-18)
 
-Same 50 retrieval gold questions, judged per-claim by Claude (`claude-sonnet-4-6`).
+**Private corpus** — same 50 retrieval gold questions
+(`data/eval/private-gold.jsonl`), judged per-claim by Claude (`claude-sonnet-4-6`).
 Answer prompt tightened to require inline citations and forbid uncited factual
 sentences.
 
@@ -168,21 +195,26 @@ Each change is a separate experiment; keep what improves the eval baseline.
    measure. Revisit when image-heavy articles land.
 5. Content-hash dedup — do when corpus growth makes re-ingest cost matter.
 
-## Next up (planned 2026-07-06)
+## Next up (updated 2026-07-16)
 
-Retrieval eval is saturated (Recall@5 0.980, one miss left), so the plan
-shifts axis after one last retrieval slice:
+Project direction settled: **the repo is the product** — a reference
+implementation of eval-driven RAG that anyone can clone, run, and reproduce.
+Retrieval eval is saturated (Recall@5 0.980, one miss left), so the order is:
 
-1. **5b.3 contextual chunk headers** — measure against eval, keep or revert.
+1. **Demo corpus content** — write the ~10–12 synthetic articles
+   (fictional companies, engineered eval traps) + the demo gold set, so
+   "clone and it works" becomes true. The two-profile wiring is already done
+   (see "Corpora" above).
+2. **5b.3 contextual chunk headers** — measure against eval, keep or revert.
    Closes Phase 5b.
-2. **Phase 4 tests** — modules are stable now. Pure functions first: chunker,
+3. **Phase 4 tests** — modules are stable now. Pure functions first: chunker,
    citation validator, loader, eval metrics. Safety net before the Phase 6
    refactor.
-3. **Phase 6 (main arc)** — FastAPI (`POST /query` + SSE streaming) → SQLite
+4. **Phase 6 (main arc)** — FastAPI (`POST /query` + SSE streaming) → SQLite
    chat history → feedback endpoint. Streamlit stays as debug UI. Unblocks
    Phase 7 (Next.js).
-4. **Ongoing** — grow corpus and gold set together; that restores eval
-   headroom and makes future retrieval ideas measurable again.
+5. **Ongoing** — grow the private corpus and gold set together; that restores
+   eval headroom and makes future retrieval ideas measurable again.
 
 Deferred: image captioning (see above), further retrieval tuning (no
 measurable headroom), faithfulness prompt iteration (hard-hallucination

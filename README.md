@@ -69,8 +69,12 @@ uv sync
 # 3. Start the vector database
 docker compose up -d qdrant
 
-# 4. Drop articles in data/articles/ (see "Adding a new article" below), then ingest
+# 4. Ingest the demo corpus (synthetic articles committed in data/articles_demo/)
 uv run python -m scripts.ingest
+
+#    ...or use your own articles: drop them in data/articles/
+#    (see "Adding a new article" below) and switch the profile
+uv run python -m scripts.ingest --private
 
 # 5. Open the chat UI
 uv run streamlit run apps/ui_streamlit/src/ui_streamlit/app.py
@@ -85,7 +89,35 @@ Prefer the command line?
 uv run python -m scripts.query "what is context rot?"
 ```
 
+## Demo corpus vs your corpus
+
+The repo works with two corpora, selected by `CORPUS_PROFILE` in `.env` or a
+`--demo` / `--private` flag on any script:
+
+|                   | Demo (default)                               | Private                              |
+| ----------------- | -------------------------------------------- | ------------------------------------ |
+| Articles          | `data/articles_demo/` (committed, synthetic) | `data/articles/` (yours, gitignored) |
+| Qdrant collection | `articles_demo`                              | `articles`                           |
+| Gold set          | `data/eval/demo-gold.jsonl`                  | `data/eval/private-gold.jsonl`       |
+
+The profile picks all three **together**, so an eval can never accidentally
+run against the wrong corpus. The demo corpus is synthetic — fictional
+companies, original writing — so it can be committed without copyright
+issues, and its gold set makes both evals reproducible on any machine:
+
+```powershell
+uv run python -m scripts.eval                 # demo corpus (default)
+uv run python -m scripts.eval --private      # your corpus
+```
+
+> **Status:** the demo articles are currently being written; until they land,
+> the demo corpus ingests zero documents.
+
 ## Adding a new article
+
+Articles you add are your **private corpus**: they live in `data/articles/`,
+stay local (gitignored), and are used when you run with `--private` or
+`CORPUS_PROFILE=private`.
 
 ### The one rule
 
@@ -138,7 +170,7 @@ you skip it.
 ### Then re-run ingest
 
 ```powershell
-uv run python -m scripts.ingest
+uv run python -m scripts.ingest --private
 ```
 
 The script walks `data/articles/`, finds every `index.md`, chunks it, embeds

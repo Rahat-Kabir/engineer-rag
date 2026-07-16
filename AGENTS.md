@@ -19,6 +19,12 @@ FastAPI + persistence. `packages/rag_core/` is the brain; apps stay thin.
 
 
 - **Python**: 3.12+ (uv currently resolving 3.13). uv workspace.
+- **Corpora**: two profiles via `CORPUS_PROFILE` env or `--demo`/`--private`
+  script flags. `demo` (default): `data/articles_demo/` (committed,
+  synthetic) → collection `articles_demo` → `data/eval/demo-gold.jsonl`.
+  `private`: `data/articles/` (gitignored) → collection `articles` →
+  `data/eval/private-gold.jsonl`. The profile derives all three together in
+  `config.py` so they can never be mismatched.
 - **Vectors**: Qdrant (Docker, single container). Named vectors `dense`
   (cosine, 1536d) + `bm25` (sparse, IDF computed server-side).
 - **Embedder**: OpenAI `text-embedding-3-small` (dense) + `fastembed`
@@ -42,6 +48,10 @@ FastAPI + persistence. `packages/rag_core/` is the brain; apps stay thin.
   project is learning how RAG works inside.
 - **Folder-based ingest, never a crawler.** Curation over scale; a crawler
   would change the quality model of the whole corpus.
+- **Demo profile is the default.** A fresh clone must work out of the box
+  ("the repo is the product"); the private corpus is opt-in via `.env`/flag.
+- **Demo corpus is synthetic.** Original fiction (invented companies),
+  engineered to exercise retrieval — never republished copyrighted articles.
 - **Idempotent ingest.** Deterministic chunk IDs (`{doc_id}#{idx}`) and UUID5
   point IDs; re-ingest deletes + re-upserts, so it's safe to run anytime.
 - **Cross-family faithfulness judge.** Claude grades GPT answers to avoid
@@ -59,12 +69,12 @@ Non-obvious files only — the tree itself is self-explanatory (Glob it).
 
 | File | ~Lines | Purpose |
 |---|---|---|
-| `packages/rag_core/src/rag_core/config.py` | 40 | Every env knob (pydantic-settings over `.env`) |
+| `packages/rag_core/src/rag_core/config.py` | 60 | Every env knob (pydantic-settings over `.env`); corpus profile derives articles dir + collection + gold path |
 | `packages/rag_core/src/rag_core/generation/prompts/answer.md` | 15 | Answer prompt, incl. citation + refusal rules |
 | `packages/rag_core/src/rag_core/ingest/pipeline.py` | 30 | Ingest orchestrator: ensure → load → chunk → embed+sparse → upsert |
 | `packages/rag_core/src/rag_core/retrieval/search.py` | 25 | Hybrid prefetch → RRF → optional Voyage rerank → top N |
 | `packages/rag_core/src/rag_core/eval/faithfulness.py` | 325 | Per-claim grounding judge (Claude), parse/skip bookkeeping |
-| `data/eval/gold.jsonl` | 54 items | Gold questions `{question, expected_chunk_ids}`; empty list = refusal case |
+| `data/eval/private-gold.jsonl` | 54 items | Private-corpus gold questions `{question, expected_chunk_ids}`; empty list = refusal case. `demo-gold.jsonl` is the demo-corpus set (growing with the demo articles) |
 
 ## Commands
 
@@ -83,6 +93,9 @@ uv run python -m scripts.inspect chunks <doc_id>
 uv run python -m scripts.inspect chunk  <chunk_id>
 ```
 
+All scripts run against the **demo** corpus by default; add `--private`
+(or set `CORPUS_PROFILE=private` in `.env`) to target the private corpus.
+
 Ingest, query, both evals, and every Streamlit chat message hit paid APIs
 (OpenAI; Voyage and Anthropic where configured) — the paid-call approval rule
 applies. Only `inspect` and setup (`docker compose`, `uv sync`) are free.
@@ -94,8 +107,9 @@ applies. Only `inspect` and setup (`docker compose`, `uv sync`) are free.
   with `uv add <pkg>`. Never edit `pyproject.toml` `dependencies` arrays by
   hand. After any `pyproject.toml` change: `uv sync`.
 - **Corpus layout**: articles live at
-  `data/articles/<taxonomy>/<slug>/index.md` (current taxonomy:
-  `companies/<company>/<slug>/`). Corpus is gitignored.
+  `<corpus root>/<taxonomy>/<slug>/index.md` (current private taxonomy:
+  `companies/<company>/<slug>/`). Private root `data/articles/` is
+  gitignored; demo root `data/articles_demo/` is committed.
 - **Frontmatter**: `title`, `source_url`, `authors`, `published_at`, `topics`,
   `company` — all optional; a missing `title` falls back to the folder name.
 - **Never invent metadata.** If `source_url` (or any field) wasn't provided by
