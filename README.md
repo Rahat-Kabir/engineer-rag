@@ -63,6 +63,11 @@ uv run python -m scripts.ingest   # demo corpus: 11 articles, 33 chunks
 uv run python -m scripts.eval     # expect: Recall@5 1.000, MRR ~0.97, refusal 3/4
 ```
 
+Underneath the evals, the pure functions — chunker, citation parsing, gold
+loader, metrics — are pinned by a 33-test unit suite (`uv run pytest`, no
+keys needed): evals measure whether the system is good, tests guard whether
+the code still works.
+
 That refusal line is a shipped finding, not an eval bug: the demo gold set
 contains refusal-bait questions — topics the corpus mentions but never
 explains. The first answer prompt failed three of four; tightening the
@@ -103,7 +108,10 @@ uv run python -m scripts.ingest
 # 5. Run the retrieval eval — reproduce the numbers above
 uv run python -m scripts.eval
 
-# 6. Open the chat UI
+# 6. (optional) Run the unit tests — 2 seconds, no API keys needed
+uv run pytest
+
+# 7. Open the chat UI
 uv run streamlit run apps/ui_streamlit/src/ui_streamlit/app.py
 ```
 
