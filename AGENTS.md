@@ -1,149 +1,72 @@
-# engineer-rag
+# engineer-rag — Agent Instructions
 
-Engineering RAG over a curated corpus of technical articles. Quality > scale.
-Folder-based ingest (`data/articles/**/index.md`), not a crawler.
+## Overview
 
-## Core Principles
+Engineering RAG over a curated corpus of technical articles. Quality > scale:
+folder-based ingest (`data/articles/**/index.md`), never a crawler — corpus
+curation is the point. The pipeline (ingest → hybrid search → rerank → cited
+answer) works end-to-end with an eval harness; the next arc is tests, then
+FastAPI + persistence. `packages/rag_core/` is the brain; apps stay thin.
 
-- **Think Before Coding**: State assumptions. If uncertain, ask. Don't guess.
-- **Simplicity First**: No overengineering. No "flexibility" that wasn't asked for.
-- **Surgical Changes**: Only touch what is necessary. Don't reformat adjacent code.
-- **Goal-Driven**: Create verifiable success criteria, then make them pass.
-- **Fail Fast**: Don't swallow exceptions. Prefer a clear failure over silent
-  fallback. Only catch with a specific recovery plan.
-- **Ask Before Picking Tech**: Models, embedders, vector stores, libraries.
-  Always confirm with the user before introducing a new one.
+## Docs
 
-## Stack (locked)
+- `docs/PROGRESS.md` — phase status, eval baselines, known limitations,
+  next-up work. Read it before claiming "what's built" or "what's next";
+  update it when a phase completes or a baseline moves.
+
+
+## Architecture
+
 
 - **Python**: 3.12+ (uv currently resolving 3.13). uv workspace.
-- **Vectors**: Qdrant (Docker, single container). Named vectors `dense` (cosine,
-  1536d) + `bm25` (sparse, IDF computed server-side).
+- **Vectors**: Qdrant (Docker, single container). Named vectors `dense`
+  (cosine, 1536d) + `bm25` (sparse, IDF computed server-side).
 - **Embedder**: OpenAI `text-embedding-3-small` (dense) + `fastembed`
   `Qdrant/bm25` (sparse).
-- **Reranker**: Voyage `rerank-2.5` (optional; off when `VOYAGE_API_KEY`
-  is unset, retrieval falls back to hybrid-only).
+- **Reranker**: Voyage `rerank-2.5` (optional; off when `VOYAGE_API_KEY` is
+  unset, retrieval falls back to hybrid-only).
 - **Faithfulness judge**: Anthropic Claude (`claude-opus-4-7` default,
-  `claude-sonnet-4-6` cheaper) — cross-family to avoid same-model bias.
-- **LLM**: configurable via `LLM_MODEL` (currently `gpt-5.4-mini`).
-- **UI**: Streamlit (dev/debug). FastAPI + Next.js planned (Phase 6+).
+  `claude-sonnet-4-6` cheaper).
+- **LLM**: configurable via `LLM_MODEL`; `config.py` defines the default and
+  `.env` overrides it.
+- **UI**: Streamlit imports `rag_core` directly (dev/debug UI). No HTTP API
+  yet; FastAPI + Next.js land in Phases 6–7.
 - **Persistence**: SQLite planned for chat/feedback (Phase 6). No Postgres.
-- **No LangChain / LlamaIndex.** Built from primitives.
+- **Docker**: only Qdrant runs in Docker; the app runs via `uv run`. Zero
+  Dockerfiles until one is needed.
+- **Tests**: `tests/` doesn't exist yet.
 
-## Architecture rules
+### Key Decisions
 
-- **`packages/rag_core/` is the brain.** Apps are thin.
-- **Streamlit imports `rag_core` directly.** No HTTP API yet; added in Phase 6
-  alongside Next.js.
-- **One Dockerfile only when needed.** Currently zero. Only Qdrant runs in
-  Docker. App runs via `uv run`.
-- **Folder-based ingest only.** Never add a URL crawler without discussion.
+- **No LangChain / LlamaIndex — built from primitives.** The point of the
+  project is learning how RAG works inside.
+- **Folder-based ingest, never a crawler.** Curation over scale; a crawler
+  would change the quality model of the whole corpus.
 - **Idempotent ingest.** Deterministic chunk IDs (`{doc_id}#{idx}`) and UUID5
-  point IDs. Re-ingest deletes + re-upserts; safe to run anytime.
-- **Tests deferred** until modules stop changing (revisit after Phase 5).
+  point IDs; re-ingest deletes + re-upserts, so it's safe to run anytime.
+- **Cross-family faithfulness judge.** Claude grades GPT answers to avoid
+  same-model bias.
+- **Reranker optional by design.** Retrieval degrades gracefully to
+  hybrid-only instead of failing when `VOYAGE_API_KEY` is unset.
+- **SQLite (Phase 6), not Postgres.** Chat/feedback persistence doesn't need
+  a server DB; Qdrant stays the only container.
+- **Every retrieval change is an experiment.** Measured against the gold-set
+  eval and kept only if the baseline improves (see Definition of Done).
 
-## uv workspace conventions
+## Key Files
 
-- Add a dep to a specific package: `uv add --package rag_core <pkg>` (or
-  `--package ui_streamlit`).
-- Add a dep to root: `uv add <pkg>`.
-- Never edit `pyproject.toml` `dependencies` arrays by hand.
-- After any `pyproject.toml` change: `uv sync`.
+Non-obvious files only — the tree itself is self-explanatory (Glob it).
 
-## Corpus & metadata rules
+| File | ~Lines | Purpose |
+|---|---|---|
+| `packages/rag_core/src/rag_core/config.py` | 40 | Every env knob (pydantic-settings over `.env`) |
+| `packages/rag_core/src/rag_core/generation/prompts/answer.md` | 15 | Answer prompt, incl. citation + refusal rules |
+| `packages/rag_core/src/rag_core/ingest/pipeline.py` | 30 | Ingest orchestrator: ensure → load → chunk → embed+sparse → upsert |
+| `packages/rag_core/src/rag_core/retrieval/search.py` | 25 | Hybrid prefetch → RRF → optional Voyage rerank → top N |
+| `packages/rag_core/src/rag_core/eval/faithfulness.py` | 325 | Per-claim grounding judge (Claude), parse/skip bookkeeping |
+| `data/eval/gold.jsonl` | 54 items | Gold questions `{question, expected_chunk_ids}`; empty list = refusal case |
 
-- Articles live at `data/articles/<taxonomy>/<slug>/index.md` (current taxonomy:
-  `companies/<company>/<slug>/`).
-- Frontmatter fields: `title`, `source_url`, `authors`, `published_at`,
-  `topics`, `company`. All optional except `title` (which falls back to folder
-  name).
-- **Never invent metadata.** If `source_url` (or any field) wasn't provided by
-  the user, leave it out of the frontmatter. Don't guess URLs from context.
-- Images (`*.webp`, `*.png`) co-located with `index.md`. Currently stripped at
-  chunk time; VLM captioning lands in Phase 5.
-
-## Global
-
-- `AGENTS.md` is the source of truth. `CLAUDE.md` must stay byte-identical.
-  Any edit to `AGENTS.md` must be mirrored to `CLAUDE.md` in the same change.
-- After adding a new file, tool, or feature, **ask the user** whether to
-  update `README.md`, `CLAUDE.md` / `AGENTS.md` (Project Structure section),
-  and `docs/PROGRESS.md`. Don't update them silently.
-- Phase status, known limitations, and next-up work live in
-  [`docs/PROGRESS.md`](docs/PROGRESS.md). Read it before claiming "what's
-  built" or "what's next."
-
-## Project Structure
-
-```
-engineer-rag/
-├── AGENTS.md                  # mirrored to CLAUDE.md (source of truth)
-├── CLAUDE.md
-├── README.md
-├── pyproject.toml             # workspace root (uv)
-├── uv.lock
-├── docker-compose.yml         # qdrant only
-├── .env / .env.example
-│
-├── docs/
-│   └── PROGRESS.md            # phase status, decisions, limitations, next
-│
-├── data/
-│   ├── articles/                       # corpus (gitignored except README)
-│   │   ├── companies/
-│   │   │   ├── anthropic/<slug>/index.md   # + co-located *.webp / *.png
-│   │   │   ├── openai/<slug>/index.md
-│   │   │   └── google/<slug>/index.md
-│   │   └── person/
-│   │       └── <author>/<slug>/index.md
-│   └── eval/
-│       └── gold.jsonl                  # gold questions: {question, expected_chunk_ids}
-│
-├── packages/
-│   └── rag_core/
-│       ├── pyproject.toml
-│       └── src/rag_core/
-│           ├── __init__.py
-│           ├── config.py            # pydantic-settings (.env)
-│           ├── schemas.py           # Document, Chunk, Citation, RetrievedChunk, QueryResult
-│           ├── ingest/
-│           │   ├── loader.py        # walks data/articles/**/index.md, parses frontmatter
-│           │   ├── chunk.py         # paragraph chunker, ≤500 / ≥80 tokens, image refs stripped
-│           │   ├── embed.py         # OpenAI batched dense embeddings
-│           │   ├── sparse.py        # fastembed BM25 sparse vectors
-│           │   └── pipeline.py      # orchestrator: ensure → load → chunk → embed+sparse → upsert
-│           ├── retrieval/
-│           │   ├── search.py        # hybrid prefetch → optional Voyage rerank → top N
-│           │   └── rerank.py        # Voyage rerank-2.5 client (no-op fallback if no API key)
-│           ├── eval/
-│           │   ├── run.py           # retrieval eval (recall@k, MRR, refusal)
-│           │   └── faithfulness.py  # per-claim grounding via Claude judge
-│           ├── generation/
-│           │   ├── answer.py        # answer_question() → QueryResult
-│           │   └── prompts/answer.md
-│           ├── eval/
-│           │   └── run.py           # gold loader, recall@k, MRR, refusal-correct
-│           └── storage/
-│               └── qdrant.py        # ensure_collection / upsert_chunks / delete_doc / search
-│
-├── apps/
-│   └── ui_streamlit/
-│       ├── pyproject.toml
-│       └── src/ui_streamlit/
-│           └── app.py               # chat UI, citations, debug toggle
-│
-└── scripts/
-    ├── ingest.py                    # uv run python -m scripts.ingest
-    ├── query.py                     # uv run python -m scripts.query "..."
-    ├── eval.py                      # uv run python -m scripts.eval
-    ├── eval_faithfulness.py         # uv run python -m scripts.eval_faithfulness
-    └── inspect.py                   # uv run python -m scripts.inspect {docs|chunks|chunk}
-```
-
-_Planned but not built yet:_ `apps/api/` (FastAPI, Phase 6), `apps/ui_next/`
-(Next.js, Phase 7), `tests/`.
-
-## Operating commands
+## Commands
 
 ```powershell
 docker compose up -d qdrant
@@ -154,21 +77,93 @@ uv run streamlit run apps/ui_streamlit/src/ui_streamlit/app.py
 
 # Eval and inspect
 uv run python -m scripts.eval
+uv run python -m scripts.eval_faithfulness
 uv run python -m scripts.inspect docs
 uv run python -m scripts.inspect chunks <doc_id>
 uv run python -m scripts.inspect chunk  <chunk_id>
 ```
 
-## Collaboration
+Ingest, query, both evals, and every Streamlit chat message hit paid APIs
+(OpenAI; Voyage and Anthropic where configured) — the paid-call approval rule
+applies. Only `inspect` and setup (`docker compose`, `uv sync`) are free.
 
-User prefers step-by-step development with discussion at each step. Before
-large feature work:
+## Conventions
 
-- Explain the next small slice.
-- Keep scope narrow.
-- Build it.
-- Verify it runs.
-- Describe what changed and what was intentionally left unbuilt.
+- **uv workspace**: add a dep to a package with
+  `uv add --package rag_core <pkg>` (or `--package ui_streamlit`); root deps
+  with `uv add <pkg>`. Never edit `pyproject.toml` `dependencies` arrays by
+  hand. After any `pyproject.toml` change: `uv sync`.
+- **Corpus layout**: articles live at
+  `data/articles/<taxonomy>/<slug>/index.md` (current taxonomy:
+  `companies/<company>/<slug>/`). Corpus is gitignored.
+- **Frontmatter**: `title`, `source_url`, `authors`, `published_at`, `topics`,
+  `company` — all optional; a missing `title` falls back to the folder name.
+- **Never invent metadata.** If `source_url` (or any field) wasn't provided by
+  the user, leave it out of the frontmatter. Don't guess URLs from context.
+- **Images** (`*.webp`, `*.png`) sit next to `index.md`; they're stripped at
+  chunk time. Captioning is deferred until image-heavy articles land (see
+  `docs/PROGRESS.md`).
 
-Response style: short and direct. No filler, no recap-summary at the end of
-responses. State results and decisions; skip the narration.
+
+## Definition of Done
+
+- **Retrieval or chunking change**: re-run `uv run python -m scripts.eval`
+  and record the numbers in `docs/PROGRESS.md`. Keep the change only if the
+  baseline improves. Refusal deltas under ~3% between runs are
+  embedding-nondeterminism noise, not signal.
+- **Generation or prompt change**: additionally re-run
+  `uv run python -m scripts.eval_faithfulness`.
+- **New feature or behavior change**: prove it at the CLI (a script in
+  `scripts/`) before wiring it into the UI.
+- **Bug fix**: re-run whatever was broken and confirm it now works.
+- **Docs and mechanical edits**: nothing to prove.
+
+## Engineering Principles
+
+- Simplicity. No overengineering, no "flexibility" that wasn't asked for.
+- Surgical changes: touch only what's necessary; don't reformat adjacent code.
+- Goal-driven: define verifiable success criteria, then make them pass.
+- Fail fast: don't swallow exceptions; only catch with a specific recovery plan.
+- Clean up orphans: removing code means removing its unused imports, tests,
+  and dependencies too.
+
+## Code Clarity
+
+- Clear is better than clever. Do not write functionality in fewer lines if it
+  makes the code harder to understand.
+- Write more lines of code if additional lines improve readability and
+  comprehension.
+- Make things so clear that someone with zero context would completely
+  understand the variable names, method names, what things do, and why they exist.
+- When a variable or method name alone cannot fully explain something, add a
+  comment explaining what is happening and why — in code you write or change.
+
+## Do NOT
+
+- Do not add features, refactor code, or make "improvements" beyond what was asked.
+- Do not add docstrings, comments, or type annotations to code you did not change.
+- Do not introduce new tech — library, framework, model, embedder, vector
+  store, or provider — without asking first. The stack above is locked.
+- Do not add a URL crawler. Ingest is folder-based, full stop.
+- Do not invent article metadata (see Conventions).
+- Do not write content into `CLAUDE.md` — it stays a one-line `@AGENTS.md`
+  import pointer; this file is the source of truth.
+
+## Self-Update
+
+When you make changes to this project that affect the information in this
+file, update this file to reflect those changes. Specifically:
+
+- **New files**: add notable new source files to the Key Files table with
+  their purpose and approximate line count.
+- **Deleted files**: remove entries for files that no longer exist.
+- **Architecture changes**: update the Architecture section if you introduce
+  new patterns, frameworks, or significant structural changes.
+- **Build changes**: update the Commands section if the build process changes.
+- **New conventions**: if the user establishes a new coding convention during
+  a session, add it to the appropriate conventions section.
+- **Line count drift**: if a file's line count changes significantly
+  (>50 lines), update the approximate count in the Key Files table.
+
+Do NOT update this file for minor edits, bug fixes, or changes that don't
+affect the documented architecture or conventions.
