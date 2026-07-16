@@ -35,6 +35,7 @@ class Chunk(BaseModel):
 
 
 class Citation(BaseModel):
+    marker: int                      # the [N] used in the answer text; display this, never renumber
     chunk_id: str
     doc_id: str
     title: str

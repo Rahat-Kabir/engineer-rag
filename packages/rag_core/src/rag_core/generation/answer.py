@@ -47,6 +47,7 @@ def _build_citations(retrieved: list[RetrievedChunk], cited: list[int]) -> list[
         snippet = chunk.text[:240].replace("\n", " ").strip()
         citations.append(
             Citation(
+                marker=citation_index,
                 chunk_id=chunk.chunk_id,
                 doc_id=chunk.doc_id,
                 title=chunk.title,

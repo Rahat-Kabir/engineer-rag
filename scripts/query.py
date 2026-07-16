@@ -18,8 +18,8 @@ def main() -> None:
 
     if result.citations:
         print("Sources:")
-        for i, cit in enumerate(result.citations, 1):
-            line = f"  [{i}] {cit.chunk_id}  —  {cit.title}"
+        for cit in result.citations:
+            line = f"  [{cit.marker}] {cit.chunk_id}  —  {cit.title}"
             if cit.source_url:
                 line += f"\n      {cit.source_url}"
             print(line)

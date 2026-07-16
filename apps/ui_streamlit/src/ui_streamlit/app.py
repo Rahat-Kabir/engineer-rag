@@ -42,8 +42,8 @@ def render_result(result: QueryResult, show_chunks: bool) -> None:
 
     if result.citations:
         st.markdown("**Sources**")
-        for i, c in enumerate(result.citations, 1):
-            label = f"[{i}] {c.title} — `{c.chunk_id}`"
+        for c in result.citations:
+            label = f"[{c.marker}] {c.title} — `{c.chunk_id}`"
             with st.expander(label):
                 if c.source_url:
                     st.markdown(f"[Open original]({c.source_url})")
