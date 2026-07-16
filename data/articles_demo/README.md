@@ -12,5 +12,11 @@ and are covered by the repository license.
 Layout and frontmatter rules are identical to the private corpus — see
 [data/articles/README.md](../articles/README.md).
 
-Status: the demo articles are being written — see `docs/PROGRESS.md` for the
-plan. Until they land, a demo ingest finds zero documents.
+The corpus: 11 articles across three fictional companies — **Relay Systems**
+(fintech running an LLM agent in production), **Corelight Labs** (devtools,
+builds the "Threadline" RAG product), **Ferrostack** (infrastructure) — plus
+the personal blog of **Mira Chen**, a fictional staff engineer who disagrees
+with all three. The articles carry deliberate eval traps: facts split across
+documents (multi-source), explicit disagreements, near-duplicate sibling
+sections, and topics mentioned but never explained (refusal bait). The demo
+gold set (`data/eval/demo-gold.jsonl`) targets these traps.

@@ -1,9 +1,13 @@
 # Demo gold set — questions for the committed demo corpus (data/articles_demo/).
-# Being built article by article alongside the synthetic demo corpus.
 #
 # Format: one JSON object per line:
 #   {"question": "...", "expected_chunk_ids": ["<doc_id>#<chunk_index>", ...]}
 # An empty expected_chunk_ids list marks a refusal case (the corpus should not answer it).
+#
+# Question types: per-article factual, multi-source (facts split across two
+# documents), disagreement (Mira Chen vs. a company post), near-duplicate
+# stress (sibling chunks that a reranker can confuse), and refusal bait
+# (topics the corpus mentions but never explains).
 
 # --- relay-systems/arbiter-double-refund-postmortem ---
 {"question": "what caused Arbiter to issue duplicate refunds?", "expected_chunk_ids": ["companies/relay-systems/arbiter-double-refund-postmortem#1", "companies/relay-systems/arbiter-double-refund-postmortem#0"]}
@@ -11,3 +15,61 @@
 {"question": "what is Relay's verify-then-act rule?", "expected_chunk_ids": ["companies/relay-systems/arbiter-double-refund-postmortem#1"]}
 {"question": "why did Relay keep the $500 autonomy threshold after the double-refund incident?", "expected_chunk_ids": ["companies/relay-systems/arbiter-double-refund-postmortem#2"]}
 {"question": "what is replay-217?", "expected_chunk_ids": ["companies/relay-systems/arbiter-double-refund-postmortem#1"]}
+
+# --- relay-systems/agent-kill-switch-design ---
+{"question": "what are Arbiter's autonomy tiers?", "expected_chunk_ids": ["companies/relay-systems/agent-kill-switch-design#0"]}
+{"question": "what signals justify pulling Relay's kill switch?", "expected_chunk_ids": ["companies/relay-systems/agent-kill-switch-design#2"]}
+{"question": "who can restore Arbiter's autonomy after the kill switch is pulled?", "expected_chunk_ids": ["companies/relay-systems/agent-kill-switch-design#1"]}
+
+# --- relay-systems/evals-before-features ---
+{"question": "how many scenarios does Gatecheck run and how often?", "expected_chunk_ids": ["companies/relay-systems/evals-before-features#0"]}
+{"question": "what counts as a regression that blocks an Arbiter release?", "expected_chunk_ids": ["companies/relay-systems/evals-before-features#1"]}
+{"question": "how does Relay validate its semantic graders?", "expected_chunk_ids": ["companies/relay-systems/evals-before-features#2"]}
+
+# --- corelight-labs/chunking-product-decision (near-duplicate stress: A vs B experiments) ---
+{"question": "what recall improvement did Corelight's 480-token chunking experiment show?", "expected_chunk_ids": ["companies/corelight-labs/chunking-product-decision#0"]}
+{"question": "why did Corelight ship 620-token chunks instead of 480?", "expected_chunk_ids": ["companies/corelight-labs/chunking-product-decision#1"]}
+{"question": "how does Threadline use document titles in retrieval?", "expected_chunk_ids": ["companies/corelight-labs/chunking-product-decision#2"]}
+
+# --- corelight-labs/hybrid-retrieval-lessons ---
+{"question": "why did Corelight choose reciprocal rank fusion over weighted score addition?", "expected_chunk_ids": ["companies/corelight-labs/hybrid-retrieval-lessons#0"]}
+{"question": "what did the cross-encoder reranker improve in Threadline?", "expected_chunk_ids": ["companies/corelight-labs/hybrid-retrieval-lessons#1"]}
+{"question": "why doesn't Threadline rewrite queries by default?", "expected_chunk_ids": ["companies/corelight-labs/hybrid-retrieval-lessons#1", "companies/corelight-labs/hybrid-retrieval-lessons#2"]}
+
+# --- corelight-labs/context-budgets ---
+{"question": "how large is Threadline's context envelope and how much is reserved for evidence?", "expected_chunk_ids": ["companies/corelight-labs/context-budgets#0"]}
+{"question": "what does Threadline do when two retrieved chunks disagree?", "expected_chunk_ids": ["companies/corelight-labs/context-budgets#1"]}
+{"question": "what is Threadline's budget trace?", "expected_chunk_ids": ["companies/corelight-labs/context-budgets#2"]}
+
+# --- ferrostack/embedding-serving-p99 ---
+{"question": "how did Ferrostack reduce queue time for short embedding inputs?", "expected_chunk_ids": ["companies/ferrostack/embedding-serving-p99#1"]}
+{"question": "what final p99 latency did Ferrostack reach for short embedding inputs?", "expected_chunk_ids": ["companies/ferrostack/embedding-serving-p99#2", "companies/ferrostack/embedding-serving-p99#0"]}
+
+# --- ferrostack/blue-green-model-deploys ---
+{"question": "what preflight checks does a green environment pass before receiving live traffic?", "expected_chunk_ids": ["companies/ferrostack/blue-green-model-deploys#0"]}
+{"question": "what are Ferrostack's rollback criteria during a model rollout?", "expected_chunk_ids": ["companies/ferrostack/blue-green-model-deploys#1"]}
+{"question": "what happened in Ferrostack's July 23 rollback?", "expected_chunk_ids": ["companies/ferrostack/blue-green-model-deploys#2"]}
+
+# --- mira-chen/against-autonomy-theater (disagreement with Relay) ---
+{"question": "what rolling budget does Mira Chen propose for Arbiter?", "expected_chunk_ids": ["person/mira-chen/against-autonomy-theater#0"]}
+{"question": "why does Mira Chen think suggest-only mode is insufficient?", "expected_chunk_ids": ["person/mira-chen/against-autonomy-theater#1"]}
+{"question": "what would Mira Chen keep from Relay's kill-switch design?", "expected_chunk_ids": ["person/mira-chen/against-autonomy-theater#2"]}
+
+# --- mira-chen/small-evals-lie (disagreement with Relay's Gatecheck) ---
+{"question": "what is Mira Chen's weekly challenge set proposal?", "expected_chunk_ids": ["person/mira-chen/small-evals-lie#1"]}
+{"question": "what does Mira Chen mean by an eval escape rate?", "expected_chunk_ids": ["person/mira-chen/small-evals-lie#2"]}
+
+# --- mira-chen/notes-on-context-budgets (disagreement with Corelight) ---
+{"question": "how would Mira Chen allocate evidence differently from Threadline?", "expected_chunk_ids": ["person/mira-chen/notes-on-context-budgets#0"]}
+{"question": "why does Mira Chen think Threadline's disagreement rule is too neutral?", "expected_chunk_ids": ["person/mira-chen/notes-on-context-budgets#1"]}
+
+# --- multi-source: facts split across two documents ---
+{"question": "what did Relay add to Gatecheck after the double-refund incident, and how often does Gatecheck run?", "expected_chunk_ids": ["companies/relay-systems/arbiter-double-refund-postmortem#1", "companies/relay-systems/evals-before-features#0"]}
+{"question": "how does Relay's shipping gate work, and why does Mira Chen think it is insufficient?", "expected_chunk_ids": ["companies/relay-systems/evals-before-features#1", "person/mira-chen/small-evals-lie#0"]}
+{"question": "what reranker floor does Threadline use for admitting chunks?", "expected_chunk_ids": ["companies/corelight-labs/context-budgets#0", "person/mira-chen/notes-on-context-budgets#0"]}
+
+# --- refusal cases: the corpus must not answer these ---
+{"question": "how does Ferrostack's Forgeglass pipeline work?", "expected_chunk_ids": []}
+{"question": "what is context rot?", "expected_chunk_ids": []}
+{"question": "how much does Relay Systems charge its customers?", "expected_chunk_ids": []}
+{"question": "who is the CEO of Corelight Labs?", "expected_chunk_ids": []}
