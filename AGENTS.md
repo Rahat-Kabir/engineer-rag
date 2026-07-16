@@ -10,9 +10,13 @@ FastAPI + persistence. `packages/rag_core/` is the brain; apps stay thin.
 
 ## Docs
 
-- `docs/PROGRESS.md` — phase status, eval baselines, known limitations,
-  next-up work. Read it before claiming "what's built" or "what's next";
-  update it when a phase completes or a baseline moves.
+- `docs/PROGRESS.md` — phase status, known limitations, next-up work. Read
+  it before claiming "what's built" or "what's next"; update it when a
+  phase completes.
+- `docs/EXPERIMENTS.md` — every eval baseline and experiment (before/after,
+  kept/reverted decisions). **Single source of truth for eval numbers** —
+  record results here, never into PROGRESS.md, and re-sync the README
+  snapshot when a baseline moves.
 
 
 ## Architecture
@@ -70,7 +74,7 @@ Non-obvious files only — the tree itself is self-explanatory (Glob it).
 | File | ~Lines | Purpose |
 |---|---|---|
 | `packages/rag_core/src/rag_core/config.py` | 60 | Every env knob (pydantic-settings over `.env`); corpus profile derives articles dir + collection + gold path |
-| `packages/rag_core/src/rag_core/generation/prompts/answer.md` | 15 | Answer prompt, incl. citation + refusal rules |
+| `packages/rag_core/src/rag_core/generation/prompts/answer.md` | 25 | Strict answer contract: per-line citations, exact refusal sentence, "mentioning is not answering" |
 | `packages/rag_core/src/rag_core/ingest/pipeline.py` | 30 | Ingest orchestrator: ensure → load → chunk → embed+sparse → upsert |
 | `packages/rag_core/src/rag_core/retrieval/search.py` | 25 | Hybrid prefetch → RRF → optional Voyage rerank → top N |
 | `packages/rag_core/src/rag_core/eval/faithfulness.py` | 325 | Per-claim grounding judge (Claude), parse/skip bookkeeping |
@@ -122,8 +126,8 @@ applies. Only `inspect` and setup (`docker compose`, `uv sync`) are free.
 ## Definition of Done
 
 - **Retrieval or chunking change**: re-run `uv run python -m scripts.eval`
-  and record the numbers in `docs/PROGRESS.md`. Keep the change only if the
-  baseline improves. Refusal deltas under ~3% between runs are
+  and record the numbers in `docs/EXPERIMENTS.md`. Keep the change only if
+  the baseline improves. Refusal deltas under ~3% between runs are
   embedding-nondeterminism noise, not signal.
 - **Generation or prompt change**: additionally re-run
   `uv run python -m scripts.eval_faithfulness`.

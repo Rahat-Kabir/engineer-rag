@@ -47,23 +47,29 @@ history (54-question gold set over a 10-article curated corpus):
 | + Voyage cross-encoder rerank | **0.980** | **0.980** | **0.919** |
 
 Generation is graded too: Claude judges each parsed cited claim — cross-family
-on purpose to reduce same-model bias. Current numbers: 66 graded claims,
-**78.8% supported, 3.0% contradicting their cited source**.
+on purpose to reduce same-model bias. Latest private-corpus run: 83 graded
+claims, **63.9% fully supported, 6.0% contradicting their cited source** —
+the failures are mostly right-fact-wrong-chunk citations on sentences that
+synthesize two sources, the exact class this eval exists to catch. (These
+numbers got *less* flattering when the citation contract was tightened to
+grade more of each answer — the trade is documented in
+[`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md).)
 
 **Reproduce it yourself.** The repo ships a committed demo corpus and gold
 set, so the eval runs on any machine for pennies:
 
 ```powershell
 uv run python -m scripts.ingest   # demo corpus: 11 articles, 33 chunks
-uv run python -m scripts.eval     # expect: Recall@5 1.000, MRR ~0.97, refusal 1/4
+uv run python -m scripts.eval     # expect: Recall@5 1.000, MRR ~0.97, refusal 3/4
 ```
 
-That refusal number is a deliberately shipped finding, not an eval bug: the
-demo gold set contains refusal-bait questions — topics the corpus mentions
-but never explains — and the current answer prompt fails three of four. The
-weakness and its planned fix are documented in
-[`docs/PROGRESS.md`](docs/PROGRESS.md). A reference repo that only publishes
-its wins isn't one.
+That refusal line is a shipped finding, not an eval bug: the demo gold set
+contains refusal-bait questions — topics the corpus mentions but never
+explains. The first answer prompt failed three of four; tightening the
+answer contract fixed two, and the survivor (in-corpus dollar figures luring
+an answer about pricing) is documented with the full experiment history in
+[`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md). A reference repo that only
+publishes its wins isn't one.
 
 ## Quick start
 
@@ -231,6 +237,8 @@ matter: chunking, retrieval quality, evaluation.
 
 ## Status & roadmap
 
-The project is built phase by phase. For what's done, what's next, what each
-phase measured, and what's intentionally not built yet, see
-[`docs/PROGRESS.md`](docs/PROGRESS.md).
+The project is built phase by phase. For what's done, what's next, and
+what's intentionally not built yet, see
+[`docs/PROGRESS.md`](docs/PROGRESS.md). For every eval baseline and the
+full experiment log — each change measured, kept or reverted — see
+[`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md).

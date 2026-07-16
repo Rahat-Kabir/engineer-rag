@@ -95,7 +95,7 @@ clone works out of the box.
   multi-source facts split across documents, deliberate disagreements between
   articles, near-duplicate sibling sections (reranker stress), and refusal
   bait (topics mentioned but never explained). Demo gold set: 39 questions
-  (35 retrieval + 4 refusal). Baseline below.
+  (35 retrieval + 4 refusal). Baselines: see `EXPERIMENTS.md`.
 
 The private corpus itself stays as before: curated by hand, local only
 (see project `README.md` → "Adding a new article").
@@ -119,99 +119,24 @@ The private corpus itself stays as before: curated by hand, local only
 - No streaming. Answers appear after full LLM response.
 - Hallucinated `[N]` citations are filtered out of the displayed sources but the answer text isn't rewritten.
 - **Refusal eval is flaky.** OpenAI embeddings have small non-determinism; borderline refusal cases flip between runs. Treat single-run deltas <3% as noise.
-- **Faithfulness eval has parser noise.** ~30% of LLM-formatted lines are either marker-only orphans or uncited sentences. These are surfaced separately (`parse_skipped`, `uncited`) so they don't pollute the hallucination rate, but they reduce the effective denominator (graded claims ≈ 66 / ~85 candidates).
+- **Faithfulness eval has parser noise.** A large share of LLM-formatted lines are marker-only orphans or uncited sentences. These are surfaced separately (`parse_skipped`, `uncited`) so they don't pollute the hallucination rate, but they cap grading coverage at roughly half of answer text (current coverage per corpus: see `EXPERIMENTS.md`).
 
-## Demo corpus baseline (2026-07-16)
+## Baselines & experiments
 
-**Demo corpus** (11 articles / 33 chunks, `data/eval/demo-gold.jsonl` 39
-questions, collection `articles_demo`). Pipeline: hybrid + Voyage rerank,
-same as private. Reproducible by anyone: `scripts.ingest --demo` then
-`scripts.eval --demo`.
-
-```
-Recall@5:        1.000  (35/35)
-Recall@10:       1.000  (35/35)
-MRR:             0.971  (33 of 35 at rank 1)
-Refusal-correct: 0.250  (1/4)
-```
-
-The refusal number is the honest finding: all three refusal-*bait* questions
-(topics the corpus mentions but never explains, e.g. Ferrostack's
-"Forgeglass" pipeline) were answered with citations instead of the refusal
-sentence. The answer prompt resists out-of-domain questions but not
-near-topic ones. Targeted fix: a prompt experiment (generation change →
-re-run faithfulness per Definition of Done). Retrieval saturating at 33
-chunks is expected — the demo corpus is for reproducibility, not headroom.
-
-## Baseline — current (Phase 5b.2 hybrid + Voyage rerank, 2026-05-18)
-
-**Private corpus** (10 articles, `data/eval/private-gold.jsonl`, collection
-`articles`). 54 gold questions (50 retrieval + 4 refusal). Pipeline:
-dense (OpenAI) + BM25 sparse (fastembed) → RRF (top 30) → Voyage `rerank-2.5`
-→ top N.
-
-```
-Recall@5:        0.980  (49/50)
-Recall@10:       0.980  (49/50)
-MRR:             0.919
-Refusal-correct: 1.000  (4/4)
-```
-
-~44 of 50 questions now hit at rank 1.
-
-### Phase progression (same corpus + gold set, 2026-05-17 → 2026-05-18)
-
-| Stage | Recall@5 | Recall@10 | MRR |
-|---|---|---|---|
-| Dense-only (5a baseline) | 0.780 | 0.860 | 0.630 |
-| + Hybrid (5b.1)          | 0.920 | 0.960 | 0.755 |
-| + Voyage rerank (5b.2)   | **0.980** | **0.980** | **0.919** |
-
-5b.2 lift over 5b.1: **+0.060 Recall@5, +0.164 MRR**. Cumulative lift over
-dense-only baseline: **+0.200 Recall@5, +0.289 MRR**.
-
-### Soft spots (remaining miss)
-
-Only 1 retrieval miss left:
-
-- "how does Cloudwalk use Codex day to day?" — rerank picked the wrong sibling
-  chunk. `ai-native-engineering-team#4` and `#5` are semantically near-duplicates;
-  Voyage ranked #4 above the chunk that actually mentions Cloudwalk (#5).
-  Diagnosis: chunker boundary ambiguity.
-
-## Faithfulness baseline (Phase 5c, 2026-05-18)
-
-**Private corpus** — same 50 retrieval gold questions
-(`data/eval/private-gold.jsonl`), judged per-claim by Claude (`claude-sonnet-4-6`).
-Answer prompt tightened to require inline citations and forbid uncited factual
-sentences.
-
-```
-Per-claim (N = 66 graded claims):
-  Supported:    0.788  (52 / 66)
-  Partial:      0.182  (12 / 66)
-  Unsupported:  0.030  (2 / 66)    ← hallucination rate
-
-Per-answer (N = 43 answered, 7 produced no gradable claims):
-  Fully grounded:     0.698  (30 / 43)
-  Has hallucination:  0.047  (2 / 43)
-
-Parser quality:
-  Parse-skipped:  28   (orphan citation markers — fixed in code; LLM still produces some)
-  Uncited:        46   (sentences with no [N] marker — flagged, not graded)
-```
-
-Two real hallucinations caught — both wrong-citation cases (claim attributed to
-wrong source chunk). Exactly the class of bug this eval was built to surface.
+All eval numbers and the full experiment log (before/after, kept/reverted)
+live in [`EXPERIMENTS.md`](EXPERIMENTS.md) — the single source of truth;
+this file carries no copies. Current state in words: retrieval is saturated
+on both corpora; the open issues are wrong-source citations on synthesis
+sentences, one remaining refusal-bait failure, and claim-parser coverage.
 
 ## Phase 5b (retrieval improvements)
 
 Each change is a separate experiment; keep what improves the eval baseline.
 
 1. ~~Hybrid search (dense + BM25/sparse + RRF fusion in Qdrant)~~ **[done]** —
-   +0.140 Recall@5, +0.125 MRR. Kept.
+   kept (numbers in `EXPERIMENTS.md`).
 2. ~~Cross-encoder rerank (Voyage `rerank-2.5`, top 30 → top N)~~ **[done]** —
-   +0.060 Recall@5, +0.164 MRR. Kept.
+   kept (numbers in `EXPERIMENTS.md`).
 3. Contextual chunk headers (`[Title] > [Section]` prepended) — **next**;
    targets the one remaining miss.
 4. Image captioning — **deferred**: corpus has only 2 images, nothing to
@@ -222,28 +147,34 @@ Each change is a separate experiment; keep what improves the eval baseline.
 
 Project direction settled: **the repo is the product** — a reference
 implementation of eval-driven RAG that anyone can clone, run, and reproduce.
-Retrieval eval is saturated (Recall@5 0.980, one miss left), so the order is:
+Retrieval eval is saturated (one miss left), so the order is:
 
 1. ~~Demo corpus content~~ **[done 2026-07-16]** — 11 articles, 39-question
    gold set, baseline recorded. "Clone and it works" is true.
-2. **README rewrite** — reposition around the eval story (measured pipeline
-   progression + reproducible demo numbers). Skeleton agreed.
-3. **Refusal prompt experiment** — demo baseline exposed near-topic refusal
-   failures (1/4). Generation change → re-run faithfulness per DoD.
-4. **5b.3 contextual chunk headers** — measure against eval, keep or revert.
+2. ~~README rewrite~~ **[done 2026-07-16]** — identity-first, mermaid
+   pipeline, measured results, reproducible demo numbers.
+3. ~~Refusal prompt experiment~~ **[done 2026-07-16]** — grew into the
+   answer-contract experiment (see `EXPERIMENTS.md`). Refusal 1/4 → 3/4,
+   coverage up on both corpora. Kept.
+4. **Citation-attribution experiment** — wrong-source citations on
+   synthesis sentences are now the top generation issue (5 unsupported
+   claims on private). Candidate ideas: per-fact citation guidance in the
+   prompt, or a post-generation citation check.
+5. **5b.3 contextual chunk headers** — measure against eval, keep or revert.
    Closes Phase 5b.
-5. **Phase 4 tests** — modules are stable now. Pure functions first: chunker,
+6. **Phase 4 tests** — modules are stable now. Pure functions first: chunker,
    citation validator, loader, eval metrics. Safety net before the Phase 6
    refactor.
-6. **Phase 6 (main arc)** — FastAPI (`POST /query` + SSE streaming) → SQLite
+7. **Phase 6 (main arc)** — FastAPI (`POST /query` + SSE streaming) → SQLite
    chat history → feedback endpoint. Streamlit stays as debug UI. Unblocks
    Phase 7 (Next.js).
-7. **Ongoing** — grow the private corpus and gold set together; that restores
+8. **Ongoing** — grow the private corpus and gold set together; that restores
    eval headroom and makes future retrieval ideas measurable again.
 
 Deferred: image captioning (see above), further retrieval tuning (no
-measurable headroom), faithfulness prompt iteration (hard-hallucination
-rate already ~3%; revisit the 46 uncited sentences later).
+measurable headroom), claim-parser hardening (only after the prompt-side
+fixes plateau, and only with an old-vs-new parser parallel run — changing
+the parser changes the ruler).
 
 ## Operating commands
 
