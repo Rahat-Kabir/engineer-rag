@@ -58,7 +58,7 @@ grade more of each answer — the trade is documented in
 **Reproduce it yourself.** The repo ships a committed demo corpus and gold
 set, so the eval runs on any machine for pennies:
 
-```powershell
+```bash
 uv run python -m scripts.ingest   # demo corpus: 11 articles, 33 chunks
 uv run python -m scripts.eval     # expect: Recall@5 1.000, MRR ~0.97, refusal 3/4
 ```
@@ -86,9 +86,9 @@ publishes its wins isn't one.
 
 ### Run it
 
-```powershell
+```bash
 # 1. Configure
-copy .env.example .env        # macOS / Linux: cp .env.example .env
+cp .env.example .env          # Windows (PowerShell): copy .env.example .env
 #    then open .env and paste your OPENAI_API_KEY
 
 # 2. Install dependencies
@@ -109,7 +109,7 @@ uv run streamlit run apps/ui_streamlit/src/ui_streamlit/app.py
 
 The UI opens at **http://localhost:8501**. Prefer the command line?
 
-```powershell
+```bash
 uv run python -m scripts.query "what caused Arbiter to issue duplicate refunds?"
 ```
 
@@ -204,7 +204,7 @@ Only `title` is recommended, and even that falls back to the folder name.
 
 ### Then re-run ingest
 
-```powershell
+```bash
 uv run python -m scripts.ingest --private
 ```
 
@@ -212,9 +212,10 @@ Re-running is safe — existing chunks are replaced (idempotent).
 
 ## What it doesn't do (yet)
 
-- **Near-topic refusals are weak.** The demo eval's refusal-bait questions
-  fail 3/4 — the model stretches an answer from adjacent chunks instead of
-  refusing. A prompt experiment is queued.
+- **Citations sometimes point at the wrong chunk.** The top known generation
+  issue: a true fact cited against the wrong source, usually on sentences
+  that synthesize two chunks (5 documented cases). A citation-attribution
+  experiment is queued. One refusal-bait question also still slips through.
 - **No image understanding.** Diagrams are stripped at ingest time; VLM
   captioning is deferred until image-heavy articles land.
 - **The claim parser loses some sentences.** Uncited and orphan-marker
@@ -242,3 +243,9 @@ what's intentionally not built yet, see
 [`docs/PROGRESS.md`](docs/PROGRESS.md). For every eval baseline and the
 full experiment log — each change measured, kept or reverted — see
 [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md).
+
+## License
+
+MIT — see [`LICENSE`](LICENSE). The synthetic demo corpus in
+`data/articles_demo/` is original fiction written for this repository and is
+covered by the same license.
