@@ -23,48 +23,59 @@ def _strip_image_refs(text: str) -> str:
 
 def _split_long(text: str, max_tokens: int) -> list[str]:
     """Hard split a too-long block into <= max_tokens pieces by token slicing."""
-    ids = _ENC.encode(text)
-    if len(ids) <= max_tokens:
+    token_ids = _ENC.encode(text)
+    if len(token_ids) <= max_tokens:
         return [text]
-    out = []
-    for i in range(0, len(ids), max_tokens):
-        out.append(_ENC.decode(ids[i : i + max_tokens]))
-    return out
+    pieces = []
+    for start_index in range(0, len(token_ids), max_tokens):
+        pieces.append(_ENC.decode(token_ids[start_index : start_index + max_tokens]))
+    return pieces
 
 
 def chunk_document(doc: Document) -> list[Chunk]:
     body = _strip_image_refs(doc.body).strip()
-    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", body) if p.strip()]
+    paragraphs = [
+        paragraph.strip()
+        for paragraph in re.split(r"\n\s*\n", body)
+        if paragraph.strip()
+    ]
 
     blocks: list[str] = []
-    for p in paragraphs:
-        for piece in _split_long(p, MAX_TOKENS):
+    for paragraph in paragraphs:
+        for piece in _split_long(paragraph, MAX_TOKENS):
             blocks.append(piece)
 
-    merged: list[str] = []
-    buf = ""
-    buf_tokens = 0
-    for b in blocks:
-        bt = _count(b)
-        if buf and buf_tokens + bt > MAX_TOKENS:
-            merged.append(buf)
-            buf, buf_tokens = b, bt
+    chunk_texts: list[str] = []
+    current_chunk_text = ""
+    current_chunk_token_count = 0
+    for block in blocks:
+        block_token_count = _count(block)
+        if (
+            current_chunk_text
+            and current_chunk_token_count + block_token_count > MAX_TOKENS
+        ):
+            chunk_texts.append(current_chunk_text)
+            current_chunk_text = block
+            current_chunk_token_count = block_token_count
         else:
-            buf = f"{buf}\n\n{b}" if buf else b
-            buf_tokens += bt
-    if buf:
-        if merged and buf_tokens < MIN_TOKENS:
-            merged[-1] = merged[-1] + "\n\n" + buf
+            current_chunk_text = (
+                f"{current_chunk_text}\n\n{block}" if current_chunk_text else block
+            )
+            current_chunk_token_count += block_token_count
+    if current_chunk_text:
+        # Avoid leaving a tiny final chunk with too little context for retrieval.
+        if chunk_texts and current_chunk_token_count < MIN_TOKENS:
+            chunk_texts[-1] = chunk_texts[-1] + "\n\n" + current_chunk_text
         else:
-            merged.append(buf)
+            chunk_texts.append(current_chunk_text)
 
     chunks: list[Chunk] = []
-    for i, text in enumerate(merged):
+    for chunk_index, text in enumerate(chunk_texts):
         chunks.append(
             Chunk(
-                chunk_id=f"{doc.doc_id}#{i}",
+                chunk_id=f"{doc.doc_id}#{chunk_index}",
                 doc_id=doc.doc_id,
-                chunk_index=i,
+                chunk_index=chunk_index,
                 text=text,
                 token_count=_count(text),
                 title=doc.title,

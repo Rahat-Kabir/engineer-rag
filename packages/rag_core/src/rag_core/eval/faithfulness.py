@@ -86,13 +86,19 @@ class FaithfulnessSummary:
 
     @property
     def supported_rate(self) -> float:
-        n = self.claims_total - self.claims_errored
-        return self.claims_supported / n if n else 0.0
+        graded_claim_count = self.claims_total - self.claims_errored
+        return (
+            self.claims_supported / graded_claim_count if graded_claim_count else 0.0
+        )
 
     @property
     def hallucination_rate(self) -> float:
-        n = self.claims_total - self.claims_errored
-        return self.claims_unsupported / n if n else 0.0
+        graded_claim_count = self.claims_total - self.claims_errored
+        return (
+            self.claims_unsupported / graded_claim_count
+            if graded_claim_count
+            else 0.0
+        )
 
     @property
     def fully_grounded_rate(self) -> float:
@@ -111,33 +117,40 @@ def _merge_orphan_citations(text: str) -> str:
     them so the marker stays attached to the sentence it cites.
     """
     lines = text.split("\n")
-    out: list[str] = []
-    pending = ""
+    merged_lines: list[str] = []
+    pending_citation_markers = ""
     for line in lines:
         stripped = line.strip()
         if not stripped:
             # Blank line. If we have pending markers, swallow it (don't emit
             # blank between the marker and the content we're about to merge it
             # with). Otherwise keep the blank.
-            if not pending:
-                out.append(line)
+            if not pending_citation_markers:
+                merged_lines.append(line)
             continue
         # Is this line only citation markers (possibly with a bullet prefix)?
-        bare = _CITE_RE.sub("", _BULLET_PREFIX.sub("", stripped)).strip()
+        text_without_markers = _CITE_RE.sub(
+            "", _BULLET_PREFIX.sub("", stripped)
+        ).strip()
         has_marker = bool(_CITE_RE.search(stripped))
-        word_count = len(_WORD.findall(bare))
+        word_count = len(_WORD.findall(text_without_markers))
         if has_marker and word_count == 0:
-            pending = f"{pending} {stripped}".strip() if pending else stripped
+            pending_citation_markers = (
+                f"{pending_citation_markers} {stripped}".strip()
+                if pending_citation_markers
+                else stripped
+            )
             continue
         # Real content line. Prepend any pending markers.
-        if pending:
-            out.append(f"{pending} {line.lstrip()}")
-            pending = ""
+        if pending_citation_markers:
+            merged_lines.append(f"{pending_citation_markers} {line.lstrip()}")
+            pending_citation_markers = ""
         else:
-            out.append(line)
-    if pending:  # orphan at very end — keep so parse_skipped accounts for it
-        out.append(pending)
-    return "\n".join(out)
+            merged_lines.append(line)
+    if pending_citation_markers:
+        # Keep an orphan at the end so parse_skipped accounts for it.
+        merged_lines.append(pending_citation_markers)
+    return "\n".join(merged_lines)
 
 
 def _parse_claims(
@@ -157,9 +170,9 @@ def _parse_claims(
           (parser failures — surfaced separately so they don't pollute the
           hallucination rate)
     """
-    cited: list[tuple[str, list[int]]] = []
-    uncited = 0
-    skipped = 0
+    cited_claims: list[tuple[str, list[int]]] = []
+    uncited_count = 0
+    parse_skipped_count = 0
 
     # 0. Re-attach orphan citation markers to the next content line.
     answer = _merge_orphan_citations(answer)
@@ -174,31 +187,40 @@ def _parse_claims(
         if not line:
             continue
         if len(line) > 200 and _SENT_SPLIT.search(line):
-            for s in _SENT_SPLIT.split(line):
-                s = s.strip()
-                if s:
-                    candidates.append(s)
+            for sentence in _SENT_SPLIT.split(line):
+                sentence = sentence.strip()
+                if sentence:
+                    candidates.append(sentence)
         else:
             candidates.append(line)
 
     # 3. Classify each candidate.
-    for s in candidates:
-        nums = sorted({int(m.group(1)) for m in _CITE_RE.finditer(s)})
-        nums = [n for n in nums if 1 <= n <= max_chunks]
+    for candidate in candidates:
+        citation_indices = sorted(
+            {
+                int(citation_match.group(1))
+                for citation_match in _CITE_RE.finditer(candidate)
+            }
+        )
+        citation_indices = [
+            citation_index
+            for citation_index in citation_indices
+            if 1 <= citation_index <= max_chunks
+        ]
         # Strip [N] markers to check if there's a real claim left.
-        bare = _CITE_RE.sub("", s).strip()
-        word_count = len(_WORD.findall(bare))
+        claim_text = _CITE_RE.sub("", candidate).strip()
+        word_count = len(_WORD.findall(claim_text))
         if word_count < _MIN_WORDS:
-            if nums:
-                skipped += 1  # citation marker but no real claim
+            if citation_indices:
+                parse_skipped_count += 1
             # else: empty/junk line, drop silently
             continue
-        if nums:
-            cited.append((bare, nums))  # use cleaned text for the judge
+        if citation_indices:
+            cited_claims.append((claim_text, citation_indices))
         else:
-            uncited += 1
+            uncited_count += 1
 
-    return cited, uncited, skipped
+    return cited_claims, uncited_count, parse_skipped_count
 
 
 def _judge(client: anthropic.Anthropic, claim: str, sources: list[str]) -> str:
@@ -206,53 +228,59 @@ def _judge(client: anthropic.Anthropic, claim: str, sources: list[str]) -> str:
     source_text = "\n\n---\n\n".join(sources)
     prompt = _JUDGE_PROMPT.format(claim=claim, sources=source_text)
     try:
-        resp = client.messages.create(
+        response = client.messages.create(
             model=settings.judge_model,
             max_tokens=10,
             temperature=0,
             messages=[{"role": "user", "content": prompt}],
         )
         text = ""
-        for block in resp.content:
+        for block in response.content:
             block_text = getattr(block, "text", None)
             if block_text:
                 text = block_text.strip().lower()
                 break
-    except Exception as e:  # noqa: BLE001
-        print(f"  ! judge error: {e}")
+    except Exception as error:  # noqa: BLE001
+        print(f"  ! judge error: {error}")
         return "error"
 
     # Try exact match first, then fuzzy match.
     if text in _VALID_VERDICTS:
         return text
-    for v in ("yes", "partial", "no"):
-        if v in text:
-            return v
+    for verdict in ("yes", "partial", "no"):
+        if verdict in text:
+            return verdict
     return "error"
 
 
 def _eval_question(client: anthropic.Anthropic, question: str, top_k: int) -> QuestionFaithfulness:
     result = answer_question(question, top_k=top_k)
-    cited, uncited_count, skipped = _parse_claims(
+    cited_claims, uncited_count, parse_skipped_count = _parse_claims(
         result.answer, max_chunks=len(result.retrieved)
     )
 
     # No usable cited claims → treat as refusal (matches scripts.eval refusal logic).
-    if not cited:
+    if not cited_claims:
         return QuestionFaithfulness(
             question=question,
             answer=result.answer,
             refused=True,
             claims=[],
             uncited_sentences=uncited_count,
-            parse_skipped=skipped,
+            parse_skipped=parse_skipped_count,
         )
 
     claims: list[ClaimVerdict] = []
-    for sentence, nums in cited:
+    for sentence, citation_indices in cited_claims:
         # Gather cited chunk texts. Index is 1-based in the answer; retrieved is 0-based.
-        sources = [result.retrieved[n - 1].chunk.text for n in nums]
-        cited_chunk_ids = [result.retrieved[n - 1].chunk.chunk_id for n in nums]
+        sources = [
+            result.retrieved[citation_index - 1].chunk.text
+            for citation_index in citation_indices
+        ]
+        cited_chunk_ids = [
+            result.retrieved[citation_index - 1].chunk.chunk_id
+            for citation_index in citation_indices
+        ]
         verdict = _judge(client, sentence, sources)
         claims.append(ClaimVerdict(
             sentence=sentence,
@@ -266,7 +294,7 @@ def _eval_question(client: anthropic.Anthropic, question: str, top_k: int) -> Qu
         refused=False,
         claims=claims,
         uncited_sentences=uncited_count,
-        parse_skipped=skipped,
+        parse_skipped=parse_skipped_count,
     )
 
 
@@ -280,46 +308,59 @@ def run_faithfulness(gold_path: Path, top_k: int = 6) -> FaithfulnessSummary:
     items = load_gold(gold_path)
 
     per_question: list[QuestionFaithfulness] = []
-    for i, item in enumerate(items, 1):
+    for item_index, item in enumerate(items, 1):
         # Skip refusal-by-design questions (expected_chunk_ids=[]). They're for retrieval eval.
         if item.is_refusal:
             continue
-        print(f"  [{i}/{len(items)}] {item.question[:70]}")
+        print(f"  [{item_index}/{len(items)}] {item.question[:70]}")
         per_question.append(_eval_question(client, item.question, top_k=top_k))
 
-    answered = sum(1 for q in per_question if not q.refused)
-    refused = sum(1 for q in per_question if q.refused)
+    answered_count = sum(1 for question_result in per_question if not question_result.refused)
+    refused_count = sum(1 for question_result in per_question if question_result.refused)
 
-    all_claims = [c for q in per_question for c in q.claims]
-    supported = sum(1 for c in all_claims if c.verdict == "yes")
-    partial = sum(1 for c in all_claims if c.verdict == "partial")
-    unsupported = sum(1 for c in all_claims if c.verdict == "no")
-    errored = sum(1 for c in all_claims if c.verdict == "error")
+    all_claims = [
+        claim
+        for question_result in per_question
+        for claim in question_result.claims
+    ]
+    supported_count = sum(1 for claim in all_claims if claim.verdict == "yes")
+    partial_count = sum(1 for claim in all_claims if claim.verdict == "partial")
+    unsupported_count = sum(1 for claim in all_claims if claim.verdict == "no")
+    errored_count = sum(1 for claim in all_claims if claim.verdict == "error")
 
-    uncited_total = sum(q.uncited_sentences for q in per_question)
-    parse_skipped_total = sum(q.parse_skipped for q in per_question)
-
-    fully_grounded = sum(
-        1 for q in per_question
-        if not q.refused and q.claims and all(c.verdict == "yes" for c in q.claims)
+    uncited_total = sum(
+        question_result.uncited_sentences for question_result in per_question
     )
-    with_hallucination = sum(
-        1 for q in per_question
-        if not q.refused and any(c.verdict == "no" for c in q.claims)
+    parse_skipped_total = sum(
+        question_result.parse_skipped for question_result in per_question
+    )
+
+    fully_grounded_count = sum(
+        1
+        for question_result in per_question
+        if not question_result.refused
+        and question_result.claims
+        and all(claim.verdict == "yes" for claim in question_result.claims)
+    )
+    hallucination_answer_count = sum(
+        1
+        for question_result in per_question
+        if not question_result.refused
+        and any(claim.verdict == "no" for claim in question_result.claims)
     )
 
     return FaithfulnessSummary(
         total=len(per_question),
-        answered=answered,
-        refused=refused,
+        answered=answered_count,
+        refused=refused_count,
         claims_total=len(all_claims),
-        claims_supported=supported,
-        claims_partial=partial,
-        claims_unsupported=unsupported,
-        claims_errored=errored,
+        claims_supported=supported_count,
+        claims_partial=partial_count,
+        claims_unsupported=unsupported_count,
+        claims_errored=errored_count,
         uncited_total=uncited_total,
         parse_skipped_total=parse_skipped_total,
-        fully_grounded_answers=fully_grounded,
-        answers_with_hallucination=with_hallucination,
+        fully_grounded_answers=fully_grounded_count,
+        answers_with_hallucination=hallucination_answer_count,
         per_question=per_question,
     )
