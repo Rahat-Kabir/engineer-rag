@@ -146,34 +146,31 @@ Each change is a separate experiment; keep what improves the eval baseline.
    measure. Revisit when image-heavy articles land.
 5. Content-hash dedup — do when corpus growth makes re-ingest cost matter.
 
-## Next up (updated 2026-07-16)
+## Next up (updated 2026-07-16 — resume here)
 
-Project direction settled: **the repo is the product** — a reference
-implementation of eval-driven RAG that anyone can clone, run, and reproduce.
-Retrieval eval is saturated (one miss left), so the order is:
+Direction: **the repo is the product**. Shipped 2026-07-16: two-corpus
+system, demo corpus + gold set, answer-contract experiment, EXPERIMENTS.md
+split, citation-marker fix, README rewrite, Phase 4 tests. Live queue:
 
-1. ~~Demo corpus content~~ **[done 2026-07-16]** — 11 articles, 39-question
-   gold set, baseline recorded. "Clone and it works" is true.
-2. ~~README rewrite~~ **[done 2026-07-16]** — identity-first, mermaid
-   pipeline, measured results, reproducible demo numbers.
-3. ~~Refusal prompt experiment~~ **[done 2026-07-16]** — grew into the
-   answer-contract experiment (see `EXPERIMENTS.md`). Refusal 1/4 → 3/4,
-   coverage up on both corpora. Kept.
-4. **Citation-attribution experiment** — wrong-source citations on
-   synthesis sentences are now the top generation issue (5 unsupported
-   claims on private). Candidate ideas: per-fact citation guidance in the
-   prompt, or a post-generation citation check.
-5. **5b.3 contextual chunk headers** — measure against eval, keep or revert.
-   Closes Phase 5b.
-6. ~~Phase 4 tests~~ **[done 2026-07-16]** — 33 pure-function unit tests
-   (written by Codex, audited). Two behavior findings recorded in Known
-   limitations: chunker tail-merge overshoot, sentence-split marker
-   migration. CI deferred by choice.
-7. **Phase 6 (main arc)** — FastAPI (`POST /query` + SSE streaming) → SQLite
+1. **Citation-attribution experiment** (generation, small). True facts
+   cited against the wrong chunk — 5 unsupported claims on private, all
+   synthesis sentences. Try prompt guidance first ("cite the chunk that
+   contains *this* fact; cite both chunks on synthesis sentences"). DoD:
+   re-run faithfulness on both corpora; success = unsupported drops without
+   coverage dropping.
+2. **5b.3 contextual chunk headers + chunker tail-merge fix** (retrieval,
+   bundled on purpose). Prepend `[Title > Section]` to chunk text before
+   embedding, and fix the tail-merge MAX_TOKENS overshoot in the same slice
+   — both changes shift chunk ids, so both gold sets get their expected ids
+   re-derived once. Targets the Cloudwalk miss and the demo near-duplicate
+   trap. DoD: re-run retrieval eval on both corpora. Closes Phase 5b.
+3. **Phase 6 (main arc)** — FastAPI (`POST /query` + SSE streaming) → SQLite
    chat history → feedback endpoint. Streamlit stays as debug UI. Unblocks
    Phase 7 (Next.js).
-8. **Ongoing** — grow the private corpus and gold set together; that restores
-   eval headroom and makes future retrieval ideas measurable again.
+
+Side items, anytime: retake the README screenshot (still shows the pre-demo
+era); CI (tests exist, workflow deferred by choice); grow the private
+corpus + gold set for eval headroom.
 
 Deferred: image captioning (see above), further retrieval tuning (no
 measurable headroom), claim-parser hardening (only after the prompt-side
