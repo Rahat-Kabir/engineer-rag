@@ -1,0 +1,13 @@
+# Demo gold set — questions for the committed demo corpus (data/articles_demo/).
+# Being built article by article alongside the synthetic demo corpus.
+#
+# Format: one JSON object per line:
+#   {"question": "...", "expected_chunk_ids": ["<doc_id>#<chunk_index>", ...]}
+# An empty expected_chunk_ids list marks a refusal case (the corpus should not answer it).
+
+# --- relay-systems/arbiter-double-refund-postmortem ---
+{"question": "what caused Arbiter to issue duplicate refunds?", "expected_chunk_ids": ["companies/relay-systems/arbiter-double-refund-postmortem#1", "companies/relay-systems/arbiter-double-refund-postmortem#0"]}
+{"question": "how many disputes did Arbiter double-refund?", "expected_chunk_ids": ["companies/relay-systems/arbiter-double-refund-postmortem#0"]}
+{"question": "what is Relay's verify-then-act rule?", "expected_chunk_ids": ["companies/relay-systems/arbiter-double-refund-postmortem#1"]}
+{"question": "why did Relay keep the $500 autonomy threshold after the double-refund incident?", "expected_chunk_ids": ["companies/relay-systems/arbiter-double-refund-postmortem#2"]}
+{"question": "what is replay-217?", "expected_chunk_ids": ["companies/relay-systems/arbiter-double-refund-postmortem#1"]}
