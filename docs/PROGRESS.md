@@ -26,7 +26,7 @@ data/articles/**/index.md
 | 1 | Spine: ingest (loader/chunk/embed/pipeline) + dense search + CLI scripts | [done] |
 | 2 | Generation: LLM answer, citation extraction, validator, refusal prompt | [done] |
 | 3 | Streamlit UI: chat, citations, retrieved-chunks debug, sidebar controls | [done] |
-| 4 | Tests for stable modules | [skipped] revisit after Phase 5 |
+| 4 | Tests for stable modules (33 pure-function unit tests) | [done] 2026-07-16 |
 | 5a | Eval harness: gold dataset, recall@k, MRR, scripts/eval.py | [done] |
 | 5b | Retrieval improvements (each measured against eval) | [in progress] |
 | 5b.1 | Hybrid search (dense + BM25 sparse, RRF fusion) | [done] |
@@ -61,6 +61,7 @@ engineer-rag/
 │   └── storage/              # qdrant
 ├── apps/ui_streamlit/src/ui_streamlit/app.py
 ├── scripts/                  # ingest.py, query.py, eval.py, eval_faithfulness.py, inspect.py
+├── tests/                    # pure-function unit tests (chunker, citations, gold, metrics, parsing)
 ├── data/
 │   ├── articles/             # private corpus (gitignored; only README in git)
 │   ├── articles_demo/        # demo corpus (committed, synthetic; being written)
@@ -107,19 +108,21 @@ The private corpus itself stays as before: curated by hand, local only
 - **No LangChain / LlamaIndex.** Built from primitives.
 - **SQLite (later) for chat/feedback**, not Postgres. Qdrant is the only DB right now.
 - **Streamlit imports `rag_core` directly.** No API yet. FastAPI lands when Next.js starts.
-- **Tests deferred** until modules stop changing.
+- **Tests after stabilization.** Deferred until modules stopped changing;
+  landed 2026-07-16 as 33 pure-function unit tests (`uv run pytest` — no
+  API keys or Docker needed). CI deferred by choice.
 
 ## Known limitations
 
 - Re-ingest re-embeds **every** chunk every run (no content-hash dedup yet). Cost is negligible (~$0.0001/run for current corpus), but won't scale.
-- Chunker is paragraph-based, not heading-aware. Sections can leak across chunk boundaries.
+- Chunker is paragraph-based, not heading-aware. Sections can leak across chunk boundaries. The tail-merge can also push the final chunk slightly over MAX_TOKENS (bounded by MIN_TOKENS − 1 extra; pinned by a unit test).
 - Image references (`*.webp`, `*.png`) are silently stripped at chunk time. No VLM captioning yet.
 - Retrieval is **hybrid + cross-encoder rerank** (Voyage `rerank-2.5`, top 30 → top N). Falls back to hybrid-only if `VOYAGE_API_KEY` is unset.
 - No persistence: Streamlit chat history resets on refresh.
 - No streaming. Answers appear after full LLM response.
 - Hallucinated `[N]` citations are filtered out of the displayed sources but the answer text isn't rewritten.
 - **Refusal eval is flaky.** OpenAI embeddings have small non-determinism; borderline refusal cases flip between runs. Treat single-run deltas <3% as noise.
-- **Faithfulness eval has parser noise.** A large share of LLM-formatted lines are marker-only orphans or uncited sentences. These are surfaced separately (`parse_skipped`, `uncited`) so they don't pollute the hallucination rate, but they cap grading coverage at roughly half of answer text (current coverage per corpus: see `EXPERIMENTS.md`).
+- **Faithfulness eval has parser noise.** A large share of LLM-formatted lines are marker-only orphans or uncited sentences. These are surfaced separately (`parse_skipped`, `uncited`) so they don't pollute the hallucination rate, but they cap grading coverage at roughly half of answer text (current coverage per corpus: see `EXPERIMENTS.md`). One known mechanism: on prose lines over 200 chars, a marker placed after the sentence terminator ("Fact. [1]") attaches to the *next* sentence during splitting.
 
 ## Baselines & experiments
 
@@ -162,9 +165,10 @@ Retrieval eval is saturated (one miss left), so the order is:
    prompt, or a post-generation citation check.
 5. **5b.3 contextual chunk headers** — measure against eval, keep or revert.
    Closes Phase 5b.
-6. **Phase 4 tests** — modules are stable now. Pure functions first: chunker,
-   citation validator, loader, eval metrics. Safety net before the Phase 6
-   refactor.
+6. ~~Phase 4 tests~~ **[done 2026-07-16]** — 33 pure-function unit tests
+   (written by Codex, audited). Two behavior findings recorded in Known
+   limitations: chunker tail-merge overshoot, sentence-split marker
+   migration. CI deferred by choice.
 7. **Phase 6 (main arc)** — FastAPI (`POST /query` + SSE streaming) → SQLite
    chat history → feedback endpoint. Streamlit stays as debug UI. Unblocks
    Phase 7 (Next.js).

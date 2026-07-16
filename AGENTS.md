@@ -44,7 +44,9 @@ FastAPI + persistence. `packages/rag_core/` is the brain; apps stay thin.
 - **Persistence**: SQLite planned for chat/feedback (Phase 6). No Postgres.
 - **Docker**: only Qdrant runs in Docker; the app runs via `uv run`. Zero
   Dockerfiles until one is needed.
-- **Tests**: `tests/` doesn't exist yet.
+- **Tests**: `tests/` — 33 pure-function unit tests (chunker, citation
+  parsing, gold loader, eval metrics, faithfulness parsing). `uv run pytest`;
+  no API keys, Docker, or `.env` needed. No CI yet (deferred by choice).
 
 ### Key Decisions
 
@@ -89,6 +91,9 @@ uv run python -m scripts.ingest
 uv run python -m scripts.query "what is context rot?"
 uv run streamlit run apps/ui_streamlit/src/ui_streamlit/app.py
 
+# Tests (free, no keys needed)
+uv run pytest
+
 # Eval and inspect
 uv run python -m scripts.eval
 uv run python -m scripts.eval_faithfulness
@@ -102,7 +107,8 @@ All scripts run against the **demo** corpus by default; add `--private`
 
 Ingest, query, both evals, and every Streamlit chat message hit paid APIs
 (OpenAI; Voyage and Anthropic where configured) — the paid-call approval rule
-applies. Only `inspect` and setup (`docker compose`, `uv sync`) are free.
+applies. Only `inspect`, `pytest`, and setup (`docker compose`, `uv sync`)
+are free.
 
 ## Conventions
 
